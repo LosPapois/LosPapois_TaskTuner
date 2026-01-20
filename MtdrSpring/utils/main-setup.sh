@@ -121,11 +121,12 @@ while ! state_done COMPARTMENT_OCID; do
     else
       echo "Resources will be created in a new compartment named $(state_get RUN_NAME)"
       COMPARTMENT_OCID=`oci iam compartment create --compartment-id "$(state_get TENANCY_OCID)" --name "$(state_get RUN_NAME)" --description "mtdrworkshop" --query 'data.id' --raw-output`
+      sleep 120
     fi
   fi
   while ! test `oci iam compartment get --compartment-id "$COMPARTMENT_OCID" --query 'data."lifecycle-state"' --raw-output 2>/dev/null`"" == 'ACTIVE'; do
     echo "Waiting for the compartment to become ACTIVE"
-    sleep 60
+    sleep 120
   done
   state_set COMPARTMENT_OCID "$COMPARTMENT_OCID"
 done
