@@ -124,13 +124,13 @@ while ! state_done COMPARTMENT_OCID; do
       sleep 30
       COMPARTMENT_STATUS=$(oci iam compartment get --compartment-id "$COMPARTMENT_OCID" --query 'data."lifecycle-state"' --raw-output 2>/dev/null)
       echo "Waiting for compartment $COMPARTMENT_STATUS"
-      sleep 120
     fi
   fi
   while ! test `oci iam compartment get --compartment-id "$COMPARTMENT_OCID" --query 'data."lifecycle-state"' --raw-output 2>/dev/null`"" == 'ACTIVE'; do
     echo "Waiting for the compartment to become ACTIVE"
-    sleep 90
+    sleep 60
   done
+  echo "Compartment created successfully"
   state_set COMPARTMENT_OCID "$COMPARTMENT_OCID"
 done
 
