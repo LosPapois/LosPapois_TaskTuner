@@ -26,15 +26,16 @@ while ! state_done GRAAL; do
     mv graalvm-community-openjdk-22.0.2+9.1 ~/
   fi
   state_set_done GRAAL
+  state_set_done GRAAL_IMAGE
   echo "finished downloading graalVM"
 done
 
 
 # Install GraalVM native-image...
-while ! state_done GRAAL_IMAGE; do
-  ~/graalvm-community-openjdk-22.0.2+9.1/bin/gu install native-image
-  state_set_done GRAAL_IMAGE
-done
+#while ! state_done GRAAL_IMAGE; do
+#  ~/graalvm-community-openjdk-22.0.2+9.1/bin/gu install native-image
+
+#done
 
 
 # Wait for docker login
