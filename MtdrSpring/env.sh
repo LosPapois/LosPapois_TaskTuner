@@ -21,12 +21,12 @@ export -f sed_i
 # -d true if file is a directory, so it's testing if this directory exists, if it does
 # we are on Mac doing local dev
 function set_javahome(){
-  if test -d ~/graalvm-community-openjdk-22.0.2+9.1/Contents/Home/bin; then
-    # We are on Mac doing local dev
-    export JAVA_HOME=~/graalvm-community-openjdk-22.0.2+9.1/Contents/Home;
+  if test -d ~/graalvm-community-openjdk-22.0.2+9.1/bin; then
+    # We are on Linux
+    export JAVA_HOME=~/graalvm-community-openjdk-22.0.2+9.1;
   else
-    # Assume linux
-    export JAVA_HOME=~/graalvm-community-openjdk-22.0.2+9.1
+    # Assume MacOS
+    export JAVA_HOME=~/graalvm-community-openjdk-22.0.2+9.1/Contents/Home
   fi
   export PATH=$JAVA_HOME/bin:$PATH
 }
@@ -37,8 +37,9 @@ cd $MTDRWORKSHOP_LOCATION
 echo "MTDRWORKSHOP_LOCATION: $MTDRWORKSHOP_LOCATION"
 
 
-JAVA_TEST=`which java`
-if [ -n $JAVA_TEST ]; then
+
+JAVA_TEST=$(java -version 2>&1)
+if echo "$JAVA_TEST" | grep -q "22\."; then
   echo "JAVA Found: $JAVA_TEST"
 else
   set_javahome
