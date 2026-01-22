@@ -19,11 +19,13 @@ BUILDS="todolistapp-springboot"
 
 # Install Graal
 while ! state_done GRAAL; do
-  if ! test -d ~/graalvm-ce-java11-20.1.0; then
+  if ! test -d ~/graalvm-community-openjdk-22.0.2+9.1; then
     echo "downloading graalVM"
-    curl -sL https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-20.1.0/graalvm-ce-java11-linux-amd64-20.1.0.tar.gz | tar xz
+    curl -sL https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-22.0.2/graalvm-community-jdk-22.0.2_linux-x64_bin.tar.gz | tar xz
     #curl -sL https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-20.1.0/graalvm-ce-java11-linux-aarch64-20.1.0.tar.gz | tar xz
-    mv graalvm-ce-java11-20.1.0 ~/
+    #mv graalvm-ce-java11-20.1.0 ~/
+    echo "export JAVA_HOME=\$HOME/graalvm-community-openjdk-22.0.2+9.1/" >> ~/.bashrc
+    echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
   fi
   state_set_done GRAAL
   echo "finished downloading graalVM"
