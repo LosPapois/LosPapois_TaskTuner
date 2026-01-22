@@ -147,6 +147,7 @@ fi
 
 ## Run the terraform.sh in the background
 if ! state_get PROVISIONING; then
+  echo "Waiting 3min"; sleep 180 #give time for compartment to be ready
   if ps -ef | grep "$MTDRWORKSHOP_LOCATION/utils/terraform.sh" | grep -v grep; then
     echo "$MTDRWORKSHOP_LOCATION/utils/terraform.sh is already running"
   else
