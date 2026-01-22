@@ -162,6 +162,7 @@ while ! state_done NAMESPACE; do
 done
 
 # login to docker
+DOCKER_LOGOUT=$(docker logout)
 while ! state_done DOCKER_REGISTRY; do
   if test $(state_get RUN_TYPE) -ne 3; then
     ##export OCI_CLI_PROFILE=$(state_get HOME_REGION) ## have to get rid of this for non instance_principal based stuff
