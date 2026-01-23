@@ -13,8 +13,7 @@ env:
 steps:
   - type: Command
     name: "Install GraalVM Enterprise 22.x Native Image for Java22"
-    command:  yum list available | grep -i graalvm || true
-              yum -y install graalvm22-ee-jdk.aarch64
+    command:  yum -y install graalvm-22-jdk.x86_64 
 
   - type: Command
     name: "Set PATH Variable"
