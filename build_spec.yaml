@@ -1,0 +1,40 @@
+version: 0.1 
+component: build
+timeoutInSeconds: 600
+shell: bash
+
+env:
+  variables:
+    JAVA_HOME: "/home/opc/.sdkman/candidates/java/22.0.2-graalce"
+
+  exportedVariables:
+    - BuildServiceDemoVersion
+
+steps:
+  - type: Command
+    name: "Install GraalVM Enterprise 22.x Native Image for Java17"
+    command:  curl -s "https://get.sdkman.io" | bash
+              source "$HOME/.sdkman/bin/sdkman-init.sh"
+              sdk install java 22.0.2-graalce
+              pwd
+
+  - type: Command
+    name: "Set PATH Variable"
+    command: export PATH=$JAVA_HOME/bin:$PATH
+
+  - type: Command
+    name: "Docker Login"
+    command:  cd MtdrSpring;
+              oci os object get --bucket-name reacttodo-rolax --name deployment_config.tgz --file deployment_config.tgz;
+              tar -xzvf deployment_config.tgz;
+              source env.sh;
+              cat at.cfg | docker login -u "axzmghqes1gn/adan.ruiz@tec.mx" --password-stdin mx-queretaro-1.ocir.io
+
+  - type: Command
+    name: "Build"
+    command:  cd MtdrSpring;
+              source env.sh;
+              (cd backend;source build.sh)
+
+
+
