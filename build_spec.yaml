@@ -5,7 +5,7 @@ shell: bash
 
 env:
   variables:
-    JAVA_HOME: "/home/opc/.sdkman/candidates/java/22.0.2-graalce"
+    JAVA_HOME: /usr/lib64/graalvm/graalvm-java22
 
   exportedVariables:
     - BuildServiceDemoVersion
@@ -13,10 +13,7 @@ env:
 steps:
   - type: Command
     name: "Install GraalVM Enterprise 22.x Native Image for Java17"
-    command:  curl -s "https://get.sdkman.io" | bash
-              source "$HOME/.sdkman/bin/sdkman-init.sh"
-              sdk install java 22.0.2-graalce
-              pwd
+    command: yum -y install graalvm-22-jdk.aarch64
 
   - type: Command
     name: "Set PATH Variable"
