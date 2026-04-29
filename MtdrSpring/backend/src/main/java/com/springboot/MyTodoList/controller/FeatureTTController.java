@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping("/api")
 public class FeatureTTController {
 
     @Autowired
@@ -38,11 +39,15 @@ public class FeatureTTController {
 
     @PostMapping("/features")
     public ResponseEntity<FeatureTT> addFeature(@RequestBody FeatureTT feature) {
-        FeatureTT saved = featureTTService.addFeature(feature);
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("location", "" + saved.getFeatureId());
-        headers.set("Access-Control-Expose-Headers", "location");
-        return ResponseEntity.ok().headers(headers).build();
+        try {
+            FeatureTT saved = featureTTService.addFeature(feature);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("location", "" + saved.getFeatureId());
+            headers.set("Access-Control-Expose-Headers", "location");
+            return ResponseEntity.ok().headers(headers).build();
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @PutMapping("/features/{id}")

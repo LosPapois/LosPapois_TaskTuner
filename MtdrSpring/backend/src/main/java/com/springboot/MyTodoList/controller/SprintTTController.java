@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping("/api")
 public class SprintTTController {
 
     @Autowired
@@ -56,8 +57,12 @@ public class SprintTTController {
 
     @PostMapping(value = "/sprints")
     public ResponseEntity<SprintTT> addSprint(@RequestBody SprintTT sprint) {
-        SprintTT saved = sprintTTService.addSprint(sprint);
-        return new ResponseEntity<>(saved, HttpStatus.OK);
+        try {
+            SprintTT saved = sprintTTService.addSprint(sprint);
+            return new ResponseEntity<>(saved, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @PutMapping(value = "/sprints/{id}")

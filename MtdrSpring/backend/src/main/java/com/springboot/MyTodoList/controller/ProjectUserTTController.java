@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping("/api")
 public class ProjectUserTTController {
 
     @Autowired
@@ -46,6 +47,17 @@ public class ProjectUserTTController {
         Boolean flag = false;
         try {
             flag = projectUserTTService.removeMember(pjId, userId);
+            return new ResponseEntity<>(flag, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @DeleteMapping(value = "/project-memberships/project/{pjId}/user/{userId}/with-tasks")
+    public ResponseEntity<Boolean> removeMemberAndTasks(@PathVariable long pjId, @PathVariable long userId) {
+        Boolean flag = false;
+        try {
+            flag = projectUserTTService.removeMemberAndAssignedTasks(pjId, userId);
             return new ResponseEntity<>(flag, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
