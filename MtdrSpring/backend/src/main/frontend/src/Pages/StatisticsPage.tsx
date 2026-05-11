@@ -224,7 +224,7 @@ export default function StatisticsPage() {
       fetch('/api/users-tt')
         .then(r => (r.ok ? r.json() : []))
         .catch(() => []),
-      fetch(`/api/sprints/project/${projectId}`)
+      fetch(`/api/sprints/project/${projectId}/kpi`)
         .then(r => (r.ok ? r.json() : []))
         .catch(() => []),
       fetch('/api/tasks')
@@ -251,10 +251,21 @@ export default function StatisticsPage() {
           return aTime - bTime;
         });
 
+        // Exclude sprints that haven't started yet from KPI series: keep
+        // only sprints that are 'active' or 'done' or whose start date
+        // is on or before today. This avoids showing future/not-started
+        // sprints in the KPIs graphs.
+        const visibleSprints = sortedSprints.filter(s => {
+          const state = s.stateSprint?.toLowerCase();
+          if (state === 'active' || state === 'done') return true;
+          if (s.dateStartSpr) return new Date(s.dateStartSpr).getTime() <= Date.now();
+          return false;
+        });
+
         const tasksById = new Map(allTasks.map(t => [t.taskId, t]));
 
         const sprintLinks = await Promise.all(
-          sortedSprints.map(s =>
+          visibleSprints.map(s =>
             fetch(`/api/sprint-tasks/sprint/${s.sprId}`)
               .then(r => (r.ok ? r.json() : []))
               .catch(() => [] as SprintTaskDTO[])
@@ -262,7 +273,7 @@ export default function StatisticsPage() {
         );
         if (cancelled) return;
 
-        const computedSeries: SprintSeriesPoint[] = sortedSprints.map((sprint, i) => {
+        const computedSeries: SprintSeriesPoint[] = visibleSprints.map((sprint, i) => {
           const links = sprintLinks[i] ?? [];
           const tasksCompletedByMemberId: Record<number, number> = {};
           const storyPointsCompletedByMemberId: Record<number, number> = {};
@@ -293,7 +304,7 @@ export default function StatisticsPage() {
         });
 
         setMembers(projectMembers);
-        setSprints(sortedSprints);
+        setSprints(visibleSprints);
         setSeriesBySprint(computedSeries);
 
         // Calculate project progress based on all unique tasks in all sprints.
