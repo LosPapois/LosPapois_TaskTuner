@@ -119,7 +119,7 @@ export default function CycleTimeScatterPlot({ projectId, className }: CycleTime
 
     Promise.all([
       fetch(`/api/projects/${projectId}/tasks`).then(r => (r.ok ? r.json() : [])).catch(() => []),
-      fetch(`/api/sprints/project/${projectId}`).then(r => (r.ok ? r.json() : [])).catch(() => []),
+      fetch(`/api/sprints/project/${projectId}/kpi`).then(r => (r.ok ? r.json() : [])).catch(() => []),
     ])
       .then(async ([projectTasks, projectSprints]: [ProjectTaskDTO[], SprintDTO[]]) => {
         if (cancelled) return;
