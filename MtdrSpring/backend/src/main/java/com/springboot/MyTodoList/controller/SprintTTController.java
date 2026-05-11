@@ -27,6 +27,11 @@ public class SprintTTController {
         return sprintTTService.getSprintsByProject(pjId);
     }
 
+    @GetMapping(value = "/sprints/project/{pjId}/kpi")
+    public List<SprintTT> getKpiSprintsByProject(@PathVariable long pjId) {
+        return sprintTTService.getActiveAndDoneSprintsByProject(pjId);
+    }
+
     @GetMapping(value = "/sprints/project/{pjId}/active")
     public ResponseEntity<SprintTT> getActiveSprintForProject(@PathVariable long pjId) {
         try {
