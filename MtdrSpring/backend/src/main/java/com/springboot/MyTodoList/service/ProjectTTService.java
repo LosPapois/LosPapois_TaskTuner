@@ -112,10 +112,32 @@ public class ProjectTTService {
             project.setDateStartPj(updatedProject.getDateStartPj());
             project.setDateEndSetPj(updatedProject.getDateEndSetPj());
             project.setDateEndRealPj(updatedProject.getDateEndRealPj());
+            project.setAutoRollover(updatedProject.isAutoRollover());
+            project.setAutoCloseSprints(updatedProject.isAutoCloseSprints());
             return projectTTRepository.save(project);
         } else {
             return null;
         }
+    }
+
+    /**
+     * Partial update — only touches namePj and autoRollover.
+     * All other fields (dates, etc.) are read from the existing DB row,
+     * so they can never be accidentally wiped by a partial payload.
+     *
+     * @param id           the pj_id to update
+     * @param namePj       new project name
+     * @param autoRollover new rollover setting
+     * @return the saved project, or null if not found
+     */
+    public ProjectTT updateProjectSettings(long id, String namePj, boolean autoRollover, boolean autoCloseSprints) {
+        Optional<ProjectTT> existing = projectTTRepository.findById(id);
+        if (!existing.isPresent()) return null;
+        ProjectTT project = existing.get();
+        if (namePj != null && !namePj.isBlank()) project.setNamePj(namePj);
+        project.setAutoRollover(autoRollover);
+        project.setAutoCloseSprints(autoCloseSprints);
+        return projectTTRepository.save(project);
     }
 
     /**
