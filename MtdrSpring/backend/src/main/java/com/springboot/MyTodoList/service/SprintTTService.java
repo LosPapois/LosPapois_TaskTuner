@@ -96,6 +96,20 @@ public class SprintTTService {
     }
 
     /**
+     * Finds sprints for a project matching active/done states,
+     * ensuring we exclude any "future" sprints that might have been
+     * accidentally created with an active state but haven't started yet.
+     */
+    public List<SprintTT> getActiveAndDoneSprintsByProject(long pjId) {
+        List<SprintTT> sprints = sprintTTRepository.findByPjIdAndStateSprintIn(pjId, java.util.Arrays.asList("active", "done"));
+        java.time.LocalDate today = java.time.LocalDate.now();
+        
+        return sprints.stream()
+                .filter(s -> s.getDateStartSpr() != null && !s.getDateStartSpr().isAfter(today))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
      * Returns the currently active sprint for a project.
      * Wraps the Optional in ResponseEntity so the controller can
      * return 404 if no sprint is currently active.

@@ -35,6 +35,12 @@ public interface SprintTTRepository extends JpaRepository<SprintTT, Long> {
     List<SprintTT> findByPjId(long pjId);
 
     /*
+     * Sprints for a project matching specific states.
+     * Use case: KPI charts excluding future/inactive sprints.
+     */
+    List<SprintTT> findByPjIdAndStateSprintIn(long pjId, List<String> states);
+
+    /*
      * All sprints in a given lifecycle state across all projects.
      *
      * Generated SQL:
