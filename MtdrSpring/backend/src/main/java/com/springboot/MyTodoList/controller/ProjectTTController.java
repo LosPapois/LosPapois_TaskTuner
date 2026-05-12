@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -56,6 +57,22 @@ public class ProjectTTController {
             return new ResponseEntity<>(updated, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @PatchMapping(value = "/projects/{id}/settings")
+    public ResponseEntity<ProjectTT> updateProjectSettings(
+            @PathVariable long id,
+            @RequestBody Map<String, Object> body) {
+        try {
+            String namePj = (String) body.getOrDefault("namePj", null);
+            boolean autoRollover = Boolean.TRUE.equals(body.get("autoRollover"));
+            boolean autoCloseSprints = Boolean.TRUE.equals(body.get("autoCloseSprints"));
+            ProjectTT updated = projectTTService.updateProjectSettings(id, namePj, autoRollover, autoCloseSprints);
+            if (updated == null) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(updated, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
