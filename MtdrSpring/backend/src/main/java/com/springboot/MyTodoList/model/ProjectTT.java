@@ -67,6 +67,23 @@ public class ProjectTT {
     @Column(name = "DATE_END_REAL_PJ")
     private LocalDate dateEndRealPj;
 
+    /*
+     * When true, incomplete tasks (stateTask 'active' or 'delayed') are
+     * automatically copied to the next sprint when the current sprint is closed.
+     * Defaults to false — opt-in per project.
+     */
+    @Column(name = "AUTO_ROLLOVER", columnDefinition = "NUMBER(1) DEFAULT 0")
+    private boolean autoRollover = false;
+
+    /*
+     * When true, a daily scheduled job (@Scheduled) automatically marks sprints
+     * as 'done' when their dateEndSpr is in the past.
+     * When false, the manager must press "Terminar Sprint" manually on the sprint page.
+     * Defaults to false — opt-in per project.
+     */
+    @Column(name = "AUTO_CLOSE_SPRINTS", columnDefinition = "NUMBER(1) DEFAULT 0")
+    private boolean autoCloseSprints = false;
+
     // ─── Constructors ────────────────────────────────────────────────────
 
     /** Required no-args constructor for JPA proxy instantiation. */
@@ -80,6 +97,7 @@ public class ProjectTT {
         this.dateStartPj    = dateStartPj;
         this.dateEndSetPj   = dateEndSetPj;
         this.dateEndRealPj  = dateEndRealPj;
+        this.autoRollover   = false;
     }
 
     // ─── Getters & Setters ───────────────────────────────────────────────
@@ -98,4 +116,10 @@ public class ProjectTT {
 
     public LocalDate getDateEndRealPj()            { return dateEndRealPj; }
     public void setDateEndRealPj(LocalDate d)      { this.dateEndRealPj = d; }
+
+    public boolean isAutoRollover()                { return autoRollover; }
+    public void setAutoRollover(boolean b)         { this.autoRollover = b; }
+
+    public boolean isAutoCloseSprints()            { return autoCloseSprints; }
+    public void setAutoCloseSprints(boolean b)     { this.autoCloseSprints = b; }
 }

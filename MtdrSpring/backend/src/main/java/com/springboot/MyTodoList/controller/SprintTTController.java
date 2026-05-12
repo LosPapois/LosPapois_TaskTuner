@@ -83,6 +83,40 @@ public class SprintTTController {
         }
     }
 
+    /**
+     * Manual sprint termination endpoint — called when the manager presses
+     * "Terminar Sprint" on the sprint page (i.e. project has autoCloseSprints=false).
+     *
+     * Closes the sprint and activates the closest available next sprint.
+     * Returns the newly activated sprint (or 204 NO_CONTENT if none existed).
+     */
+    @PatchMapping(value = "/sprints/{id}/end")
+    public ResponseEntity<SprintTT> endSprint(@PathVariable long id) {
+        try {
+            SprintTT next = sprintTTService.closeSprintAndActivateNext(id);
+            if (next == null) {
+                // Sprint was closed but no next sprint found — still success
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            }
+            return new ResponseEntity<>(next, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PatchMapping(value = "/sprints/{id}/close")
+    public ResponseEntity<SprintTT> closeSprint(
+            @PathVariable long id,
+            @RequestParam(required = false) Long nextSprintId) {
+        try {
+            SprintTT closed = sprintTTService.closeSprint(id, nextSprintId);
+            if (closed == null) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(closed, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     @DeleteMapping(value = "/sprints/{id}")
     public ResponseEntity<Boolean> deleteSprint(@PathVariable long id) {
         Boolean flag = false;

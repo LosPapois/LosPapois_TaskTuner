@@ -1,7 +1,10 @@
 package com.springboot.MyTodoList.service;
 
+import com.springboot.MyTodoList.model.ProjectTT;
 import com.springboot.MyTodoList.model.SprintMetricsResult;
 import com.springboot.MyTodoList.model.SprintTT;
+import com.springboot.MyTodoList.model.SprintTaskTT;
+import com.springboot.MyTodoList.repository.ProjectTTRepository;
 import com.springboot.MyTodoList.repository.SprintTaskTTRepository;
 import com.springboot.MyTodoList.repository.SprintTTRepository;
 import com.springboot.MyTodoList.repository.TaskTTRepository;
@@ -9,7 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +53,9 @@ public class SprintTTService {
     /** Repository for SPRINT_TT — primary data source for this service. */
     @Autowired
     private SprintTTRepository sprintTTRepository;
+
+    @Autowired
+    private ProjectTTRepository projectTTRepository;
 
     /**
      * Repository for TASK_TT — used in getSprintMetrics() to sum story_points
@@ -177,6 +186,104 @@ public class SprintTTService {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * Closes a sprint (marks it 'done') and, if the project has autoRollover
+     * enabled, copies all incomplete tasks to the target next sprint.
+     *
+     * Rollover: any task with stateTask 'active' or 'delayed' in this sprint
+     * is inserted into nextSprintId with stateTask = 'active'.
+     *
+     * @param sprId         the sprint to close
+     * @param nextSprintId  the sprint to receive rolled-over tasks (nullable — no rollover if null)
+     * @return the updated sprint, or null if not found
+     */
+    @Transactional
+    public SprintTT closeSprint(long sprId, Long nextSprintId) {
+        Optional<SprintTT> existing = sprintTTRepository.findById(sprId);
+        if (!existing.isPresent()) return null;
+
+        SprintTT sprint = existing.get();
+        sprint.setStateSprint("done");
+        sprintTTRepository.save(sprint);
+
+        if (nextSprintId != null) {
+            Optional<ProjectTT> projectOpt = projectTTRepository.findById(sprint.getPjId());
+            if (projectOpt.isPresent() && projectOpt.get().isAutoRollover()) {
+                List<SprintTaskTT> active  = sprintTaskTTRepository.findByIdSprIdAndStateTask(sprId, "active");
+                List<SprintTaskTT> delayed = sprintTaskTTRepository.findByIdSprIdAndStateTask(sprId, "delayed");
+
+                for (SprintTaskTT st : active) {
+                    sprintTaskTTRepository.save(new SprintTaskTT(nextSprintId, st.getId().getTaskId(), "active"));
+                }
+                for (SprintTaskTT st : delayed) {
+                    sprintTaskTTRepository.save(new SprintTaskTT(nextSprintId, st.getId().getTaskId(), "active"));
+                }
+            }
+        }
+
+        return sprint;
+    }
+
+    /**
+     * Closes a sprint and activates the closest candidate sprint.
+     *
+     * Algorithm:
+     *   1. Mark this sprint as 'done'.
+     *   2. Find all non-done sprints for the same project (excluding itself).
+     *   3. Pick the one whose dateStartSpr is closest to this sprint's dateEndSpr
+     *      using MIN(|dateStart_candidate - dateEnd_closed|). Sprints with no
+     *      start date are given lowest priority (treated as Infinity distance).
+     *   4. Mark that sprint as 'active'.
+     *   5. If project has autoRollover, copy incomplete tasks to the new sprint.
+     *
+     * @param sprId  the sprint to close
+     * @return the newly activated sprint, or null if sprId not found
+     */
+    @Transactional
+    public SprintTT closeSprintAndActivateNext(long sprId) {
+        Optional<SprintTT> existing = sprintTTRepository.findById(sprId);
+        if (!existing.isPresent()) return null;
+
+        SprintTT sprint = existing.get();
+        sprint.setStateSprint("done");
+        sprintTTRepository.save(sprint);
+
+        // Find nearest candidate sprint
+        List<SprintTT> candidates = sprintTTRepository
+                .findByPjIdAndSprIdNotAndStateSprintNot(sprint.getPjId(), sprId, "done");
+
+        SprintTT nextSprint = candidates.stream()
+                .min(Comparator.comparingLong(c -> {
+                    if (c.getDateStartSpr() == null || sprint.getDateEndSpr() == null) {
+                        return Long.MAX_VALUE;
+                    }
+                    return Math.abs(
+                        c.getDateStartSpr().toEpochDay() - sprint.getDateEndSpr().toEpochDay()
+                    );
+                }))
+                .orElse(null);
+
+        if (nextSprint != null) {
+            nextSprint.setStateSprint("active");
+            sprintTTRepository.save(nextSprint);
+
+            // Rollover incomplete tasks if project has it enabled
+            Optional<ProjectTT> projectOpt = projectTTRepository.findById(sprint.getPjId());
+            if (projectOpt.isPresent() && projectOpt.get().isAutoRollover()) {
+                List<SprintTaskTT> active  = sprintTaskTTRepository.findByIdSprIdAndStateTask(sprId, "active");
+                List<SprintTaskTT> delayed = sprintTaskTTRepository.findByIdSprIdAndStateTask(sprId, "delayed");
+                for (SprintTaskTT st : active) {
+                    sprintTaskTTRepository.save(new SprintTaskTT(nextSprint.getSprId(), st.getId().getTaskId(), "active"));
+                }
+                for (SprintTaskTT st : delayed) {
+                    sprintTaskTTRepository.save(new SprintTaskTT(nextSprint.getSprId(), st.getId().getTaskId(), "active"));
+                }
+            }
+        }
+
+        return nextSprint;
     }
 
     // ─── Business Logic (Stored Procedure Equivalents) ───────────────────
