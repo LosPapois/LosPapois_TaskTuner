@@ -78,7 +78,6 @@ function App() {
         </header>
         <main className="flex-1 overflow-auto">{routes}</main>
       </div>
-      <Toaster />
     </div>
   );
 }
