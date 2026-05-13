@@ -26,6 +26,15 @@ public class TaskTTController {
         return taskTTService.getTasksByProject(pjId);
     }
 
+    /**
+     * Project board grouped by lifecycle column.
+     * Returns { "backlog": [...], "active": [...], "completed": [...] }.
+     */
+    @GetMapping(value = "/projects/{pjId}/board")
+    public ResponseEntity<java.util.Map<String, List<TaskTT>>> getProjectBoard(@PathVariable long pjId) {
+        return new ResponseEntity<>(taskTTService.getProjectBoard(pjId), HttpStatus.OK);
+    }
+
     @GetMapping(value = "/tasks/{id}")
     public ResponseEntity<TaskTT> getTaskById(@PathVariable long id){
         try{
