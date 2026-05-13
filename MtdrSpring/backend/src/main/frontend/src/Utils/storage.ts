@@ -92,4 +92,10 @@ export const STORAGE_KEYS = {
    * snapshot, just like the SPRINTS cache.
    */
   PROJECT_KPIS: 'task_tuner_project_kpis',
+  /**
+   * Per-project board cache prefix — paired with projectId at runtime
+   * (`${PROJECT_BOARD}_${pjId}`). Caches the { backlog, active, completed }
+   * shape served by /api/projects/{pjId}/board for instant first paint.
+   */
+  PROJECT_BOARD: 'task_tuner_project_board',
 } as const;

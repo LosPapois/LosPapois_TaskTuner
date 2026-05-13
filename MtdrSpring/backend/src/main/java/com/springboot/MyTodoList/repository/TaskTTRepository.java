@@ -116,4 +116,41 @@ public interface TaskTTRepository extends JpaRepository<TaskTT, Long> {
            "JOIN SprintTaskTT st ON st.id.taskId = t.taskId " +
            "WHERE st.id.sprId = :sprId")
     Long sumStoryPointsBySprint(@Param("sprId") long sprId);
+
+    /*
+     * Project board — "Backlog" column.
+     * Tasks belonging to sprints of the project that haven't started yet
+     * (dateStartSpr > today). DISTINCT in case a task somehow lives in
+     * multiple future sprints.
+     */
+    @Query("SELECT DISTINCT t FROM TaskTT t " +
+           "JOIN SprintTaskTT st ON st.id.taskId = t.taskId " +
+           "JOIN SprintTT s ON s.sprId = st.id.sprId " +
+           "WHERE s.pjId = :pjId AND s.dateStartSpr > :today")
+    List<TaskTT> findBacklogTasksByProject(@Param("pjId") long pjId,
+                                          @Param("today") java.time.LocalDate today);
+
+    /*
+     * Project board — "Active" column.
+     * Tasks of sprints that have started and aren't done yet, whose
+     * per-sprint state is still active or delayed.
+     */
+    @Query("SELECT DISTINCT t FROM TaskTT t " +
+           "JOIN SprintTaskTT st ON st.id.taskId = t.taskId " +
+           "JOIN SprintTT s ON s.sprId = st.id.sprId " +
+           "WHERE s.pjId = :pjId " +
+           "AND s.dateStartSpr <= :today " +
+           "AND st.stateTask IN ('active', 'delayed')")
+    List<TaskTT> findActiveTasksByProject(@Param("pjId") long pjId,
+                                         @Param("today") java.time.LocalDate today);
+
+    /*
+     * Project board — "Completed" column.
+     * Tasks marked done in any sprint of the project.
+     */
+    @Query("SELECT DISTINCT t FROM TaskTT t " +
+           "JOIN SprintTaskTT st ON st.id.taskId = t.taskId " +
+           "JOIN SprintTT s ON s.sprId = st.id.sprId " +
+           "WHERE s.pjId = :pjId AND st.stateTask = 'done'")
+    List<TaskTT> findCompletedTasksByProject(@Param("pjId") long pjId);
 }
