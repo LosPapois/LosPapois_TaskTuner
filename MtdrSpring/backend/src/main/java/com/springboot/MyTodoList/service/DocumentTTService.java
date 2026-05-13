@@ -3,8 +3,6 @@ package com.springboot.MyTodoList.service;
 import com.springboot.MyTodoList.model.DocumentTT;
 import com.springboot.MyTodoList.repository.DocumentTTRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -47,23 +45,18 @@ public class DocumentTTService {
     /**
      * Returns a single document by its primary key.
      *
-     * @param id  the doc_id to look up
-     * @return 200 OK with document, or 404 NOT FOUND
+     * @param id the doc_id to look up
+     * @return Optional containing the document if found
      */
-    public ResponseEntity<DocumentTT> getDocumentById(long id) {
-        Optional<DocumentTT> found = documentTTRepository.findById(id);
-        if (found.isPresent()) {
-            return new ResponseEntity<>(found.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Optional<DocumentTT> getDocumentById(long id) {
+        return documentTTRepository.findById(id);
     }
 
     /**
      * Returns all documents belonging to a project.
      * Includes both 'loading' and 'loaded' documents.
      *
-     * @param pjId  the project whose documents to retrieve
+     * @param pjId the project whose documents to retrieve
      */
     public List<DocumentTT> getDocumentsForProject(long pjId) {
         return documentTTRepository.findByPjId(pjId);
@@ -73,7 +66,7 @@ public class DocumentTTService {
      * Returns all documents awaiting embedding processing.
      *
      * Called by the background embedding job to find work:
-     *   SELECT * FROM document_tt WHERE embed_status = 'loading'
+     * SELECT * FROM document_tt WHERE embed_status = 'loading'
      */
     public List<DocumentTT> getDocumentsPendingEmbedding() {
         return documentTTRepository.findByEmbedStatus("loading");
@@ -83,7 +76,7 @@ public class DocumentTTService {
      * Returns all fully embedded documents for a project.
      * These are the documents the AI query layer can search through.
      *
-     * @param pjId  the project to query
+     * @param pjId the project to query
      * @return documents with embed_status = 'loaded' for that project
      */
     public List<DocumentTT> getLoadedDocumentsForProject(long pjId) {
@@ -96,12 +89,12 @@ public class DocumentTTService {
      * Records a new document upload.
      *
      * Automatically sets:
-     *   - dateUpload = now (timestamp of upload)
-     *   - embedStatus = 'loading' (enters the embedding pipeline)
+     * - dateUpload = now (timestamp of upload)
+     * - embedStatus = 'loading' (enters the embedding pipeline)
      *
      * The caller only needs to provide: namePjDoc, urlObjStore, pjId.
      *
-     * @param newDoc  the DocumentTT to save
+     * @param newDoc the DocumentTT to save
      * @return the saved entity with DB-assigned docId and current timestamp
      */
     public DocumentTT uploadDocument(DocumentTT newDoc) {
@@ -117,7 +110,7 @@ public class DocumentTTService {
      * Called by the embedding pipeline service after successfully
      * generating and storing the vector embeddings for a document.
      *
-     * @param id  the doc_id to mark as loaded
+     * @param id the doc_id to mark as loaded
      * @return the updated DocumentTT, or null if not found
      */
     public DocumentTT markAsLoaded(long id) {
@@ -156,7 +149,7 @@ public class DocumentTTService {
      * The physical file in OCI Object Storage must be deleted separately
      * via the OCI SDK — this only removes the DB row.
      *
-     * @param id  the doc_id to delete
+     * @param id the doc_id to delete
      * @return true if deleted, false on exception
      */
     public boolean deleteDocument(long id) {
