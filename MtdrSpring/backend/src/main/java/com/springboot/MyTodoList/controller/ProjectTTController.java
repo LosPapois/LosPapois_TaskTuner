@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import java.net.URI;
 
 import java.util.List;
 import java.util.Map;
@@ -34,30 +36,30 @@ public class ProjectTTController {
 
     @GetMapping(value = "/projects/{id}")
     public ResponseEntity<ProjectTT> getProjectById(@PathVariable long id) {
-        try {
-            return projectTTService.getProjectById(id);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        return projectTTService.getProjectById(id)
+                .map(project -> new ResponseEntity<>(project, HttpStatus.OK))
+                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @PostMapping(value = "/projects")
     public ResponseEntity<ProjectTT> addProject(@RequestBody ProjectTT project) {
         ProjectTT saved = projectTTService.addProject(project);
-        return new ResponseEntity<>(saved, HttpStatus.OK);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getPjId())
+                .toUri();
+        return ResponseEntity.created(location)
+                .header("Access-Control-Expose-Headers", "Location")
+                .body(saved);
     }
 
     @PutMapping(value = "/projects/{id}")
     public ResponseEntity<ProjectTT> updateProject(@RequestBody ProjectTT project, @PathVariable long id) {
-        try {
-            ProjectTT updated = projectTTService.updateProject(id, project);
-            if (updated == null) {
-                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(updated, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        ProjectTT updated = projectTTService.updateProject(id, project);
+        if (updated == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+        return new ResponseEntity<>(updated, HttpStatus.OK);
     }
 
     @PatchMapping(value = "/projects/{id}/settings")
@@ -78,25 +80,20 @@ public class ProjectTTController {
 
     @PatchMapping(value = "/projects/{id}/close")
     public ResponseEntity<ProjectTT> closeProject(@PathVariable long id) {
-        try {
-            ProjectTT updated = projectTTService.closeProject(id);
-            if (updated == null) {
-                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(updated, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        ProjectTT updated = projectTTService.closeProject(id);
+        if (updated == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+        return new ResponseEntity<>(updated, HttpStatus.OK);
     }
 
     @DeleteMapping(value = "/projects/{id}")
     public ResponseEntity<Boolean> deleteProject(@PathVariable long id) {
-        Boolean flag = false;
-        try {
-            flag = projectTTService.deleteProject(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+        boolean flag = projectTTService.deleteProject(id);
+        if (flag) {
+            return new ResponseEntity<>(true, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
         }
     }
 }

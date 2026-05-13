@@ -64,25 +64,20 @@ public class SprintTaskTTController {
     public ResponseEntity<SprintTaskTT> updateTaskState(@PathVariable long sprId,
                                                         @PathVariable long taskId,
                                                         @PathVariable String newState) {
-        try {
-            SprintTaskTT updated = sprintTaskTTService.updateTaskState(sprId, taskId, newState);
-            if (updated == null) {
-                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(updated, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        SprintTaskTT updated = sprintTaskTTService.updateTaskState(sprId, taskId, newState);
+        if (updated == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+        return new ResponseEntity<>(updated, HttpStatus.OK);
     }
 
     @DeleteMapping(value = "/sprint-tasks/{sprId}/{taskId}")
     public ResponseEntity<Boolean> removeTaskFromSprint(@PathVariable long sprId, @PathVariable long taskId) {
-        Boolean flag = false;
-        try {
-            flag = sprintTaskTTService.removeTaskFromSprint(sprId, taskId);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+        boolean flag = sprintTaskTTService.removeTaskFromSprint(sprId, taskId);
+        if (flag) {
+            return new ResponseEntity<>(true, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
         }
     }
 }
