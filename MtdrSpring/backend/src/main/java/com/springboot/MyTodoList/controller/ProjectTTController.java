@@ -10,6 +10,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.net.URI;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -59,6 +60,22 @@ public class ProjectTTController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
         return new ResponseEntity<>(updated, HttpStatus.OK);
+    }
+
+    @PatchMapping(value = "/projects/{id}/settings")
+    public ResponseEntity<ProjectTT> updateProjectSettings(
+            @PathVariable long id,
+            @RequestBody Map<String, Object> body) {
+        try {
+            String namePj = (String) body.getOrDefault("namePj", null);
+            boolean autoRollover = Boolean.TRUE.equals(body.get("autoRollover"));
+            boolean autoCloseSprints = Boolean.TRUE.equals(body.get("autoCloseSprints"));
+            ProjectTT updated = projectTTService.updateProjectSettings(id, namePj, autoRollover, autoCloseSprints);
+            if (updated == null) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(updated, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @PatchMapping(value = "/projects/{id}/close")
