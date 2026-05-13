@@ -30,7 +30,8 @@ jobs:
 
       - name: Run BotActions test class
         working-directory: MtdrSpring/backend
-        run: mvn -B -Dtest=BotActionsTest test
+        run: |
+          CI=false ./mvnw -B -Dtest=BotActionsTest test
 
       - name: Upload surefire reports
         if: always()
