@@ -5,6 +5,7 @@ import {
   ChevronRightIcon,
   FolderIcon,
   PlusIcon,
+  Squares2X2Icon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import SidebarItem from './SidebarItem';
@@ -156,6 +157,13 @@ function SidebarProjectGroup({
             icon={ChartBarIcon}
             label="Statistics"
             to={`/projects/${projectId}/statistics`}
+            dense
+          />
+
+          <SidebarItem
+            icon={Squares2X2Icon}
+            label="Backlog"
+            to={`/projects/${projectId}/board`}
             dense
           />
 

@@ -54,6 +54,9 @@ function App() {
       {/* which keeps NavLink's active highlight per-group correct. */}
       <Route path="/projects/:projectId/team" element={<TeamPage />} />
       <Route path="/projects/:projectId/statistics" element={<StatisticsPage />} />
+      {/* Project board (Backlog / Active / Completed) — reuses TasksPage in */}
+      {/* board mode, triggered when the route carries a projectId param. */}
+      <Route path="/projects/:projectId/board" element={<TasksPage />} />
       <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
