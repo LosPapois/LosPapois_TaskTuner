@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import java.net.URI;
 
 import java.util.List;
 
@@ -34,53 +36,43 @@ public class SprintTTController {
 
     @GetMapping(value = "/sprints/project/{pjId}/active")
     public ResponseEntity<SprintTT> getActiveSprintForProject(@PathVariable long pjId) {
-        try {
-            return sprintTTService.getActiveSprintForProject(pjId);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        return sprintTTService.getActiveSprintForProject(pjId)
+                .map(sprint -> new ResponseEntity<>(sprint, HttpStatus.OK))
+                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @GetMapping(value = "/sprints/{id}/metrics")
     public ResponseEntity<SprintMetricsResult> getSprintMetrics(@PathVariable long id) {
-        try {
-            SprintMetricsResult result = sprintTTService.getSprintMetrics(id);
-            return new ResponseEntity<>(result, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        SprintMetricsResult result = sprintTTService.getSprintMetrics(id);
+        return new ResponseEntity<>(result, HttpStatus.OK);
     }
 
     @GetMapping(value = "/sprints/{id}")
     public ResponseEntity<SprintTT> getSprintById(@PathVariable long id) {
-        try {
-            return sprintTTService.getSprintById(id);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        return sprintTTService.getSprintById(id)
+                .map(sprint -> new ResponseEntity<>(sprint, HttpStatus.OK))
+                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @PostMapping(value = "/sprints")
     public ResponseEntity<SprintTT> addSprint(@RequestBody SprintTT sprint) {
-        try {
-            SprintTT saved = sprintTTService.addSprint(sprint);
-            return new ResponseEntity<>(saved, HttpStatus.OK);
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
+        SprintTT saved = sprintTTService.addSprint(sprint);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getSprId())
+                .toUri();
+        return ResponseEntity.created(location)
+                .header("Access-Control-Expose-Headers", "Location")
+                .body(saved);
     }
 
     @PutMapping(value = "/sprints/{id}")
     public ResponseEntity<SprintTT> updateSprint(@RequestBody SprintTT sprint, @PathVariable long id) {
-        try {
-            SprintTT updated = sprintTTService.updateSprint(id, sprint);
-            if (updated == null) {
-                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(updated, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        SprintTT updated = sprintTTService.updateSprint(id, sprint);
+        if (updated == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+        return new ResponseEntity<>(updated, HttpStatus.OK);
     }
 
     /**
@@ -119,12 +111,11 @@ public class SprintTTController {
 
     @DeleteMapping(value = "/sprints/{id}")
     public ResponseEntity<Boolean> deleteSprint(@PathVariable long id) {
-        Boolean flag = false;
-        try {
-            flag = sprintTTService.deleteSprint(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+        boolean flag = sprintTTService.deleteSprint(id);
+        if (flag) {
+            return new ResponseEntity<>(true, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
         }
     }
 }

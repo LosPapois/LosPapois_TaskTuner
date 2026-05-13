@@ -29,6 +29,8 @@ import type { StatusTone } from '../Components/Sprint';
 import TaskDetailModal from '../Components/Common/TaskDetailModal';
 import type { TaskDetailData } from '../Components/Common/TaskDetailModal';
 import PageLoading from '../Components/Common/PageLoading';
+import ProgressBar from '../Components/Common/ProgressBar';
+import Sparkline from '../Components/Common/Sparkline';
 import { getFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
 import { toast } from '../Utils/toast';
 
@@ -37,131 +39,18 @@ import { toast } from '../Utils/toast';
 // All MOCK_* lives at the top so the swap to real hooks is mechanical.
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface ProjectDTO {
-  pjId: number;
-  namePj: string;
-  autoCloseSprints?: boolean;
-}
+import {
+  ProjectDTO,
+  SprintDTO,
+  SprintTaskDTO,
+  TaskDTO,
+  FeatureDTO,
+} from '../Utils/types';
+import { mapTaskPriority, normalizeTaskState, formatDate } from '../Utils/helpers';
+import { MOCK_SPRINT_BASE } from '../Utils/mockData';
+import { SprintTaskJoined, ComputedKpis, computeSprintKpis } from '../Utils/kpiUtils';
 
-/** Backend SprintTT shape — only the fields this page consumes. */
-interface SprintDTO {
-  sprId: number;
-  nameSprint: string;
-  dateStartSpr: string | null;
-  dateEndSpr: string | null;
-  taskGoal: number | null;
-  stateSprint: string;
-  pjId: number;
-}
 
-/** Backend SprintTaskTT shape — the junction table row + workflow state. */
-interface SprintTaskDTO {
-  sprId: number;
-  taskId: number;
-  /** 'active' | 'done' | 'delayed' (Oracle CHECK constraint). */
-  stateTask: string;
-}
-
-/** Backend TaskTT shape — fields used for KPIs, features, and task detail. */
-interface TaskDTO {
-  taskId: number;
-  nameTask?: string | null;
-  /** Long-text description of the task (TaskTT.infoTask, max 2000 chars). */
-  infoTask?: string | null;
-  priority?: string | null;
-  storyPoints: number | null;
-  dateStartTask: string | null;
-  dateEndSetTask: string | null;
-  dateEndRealTask: string | null;
-  userId?: number;
-  featureId?: number | null;
-}
-
-/** Backend FeatureTT shape. */
-interface FeatureDTO {
-  featureId: number;
-  nameFeature: string;
-  priorityFeature: string | null;
-  descriptionFeature: string | null;
-  sprId: number;
-}
-
-/** Joined view: a task with its workflow state inside the sprint. */
-interface SprintTaskJoined extends TaskDTO {
-  stateTask: string;
-}
-
-/** Computed KPIs for the sprint header cards. */
-interface ComputedKpis {
-  progress: number;
-  carryRate: number;
-  carriedFeatures: number;
-  totalFeatures: number;
-  taskDelay: number;
-  delayedTasks: number;
-  cycleTime: string;
-  totalTasks: number;
-}
-
-const ZERO_KPIS: ComputedKpis = {
-  progress: 0,
-  carryRate: 0,
-  carriedFeatures: 0,
-  totalFeatures: 0,
-  taskDelay: 0,
-  delayedTasks: 0,
-  cycleTime: '0.0 days',
-  totalTasks: 0,
-};
-
-/**
- * Derive the four sprint KPIs from the joined task list. All math lives in
- * the frontend because the backend exposes only `totalPoints + taskCount`
- * via /metrics — not enough for progress, carry rate, delay, or cycle time.
- *
- * Definitions (matching the screenshot semantics):
- *   - progress   = % of tasks marked 'done'
- *   - carryRate  = % of tasks marked 'delayed' at sprint close
- *   - taskDelay  = % of non-done tasks past their planned end date today
- *   - cycleTime  = average days between dateStartTask and dateEndRealTask
- *                  for tasks marked 'done'
- */
-function computeSprintKpis(tasks: SprintTaskJoined[]): ComputedKpis {
-  const total = tasks.length;
-  if (total === 0) return ZERO_KPIS;
-
-  const done    = tasks.filter(t => t.stateTask === 'done').length;
-  const delayed = tasks.filter(t => t.stateTask === 'delayed').length;
-
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const overdue = tasks.filter(
-    t => t.stateTask !== 'done' && t.dateEndSetTask != null && t.dateEndSetTask < todayIso
-  ).length;
-
-  // Cycle time only meaningful for tasks that actually closed.
-  const completed = tasks.filter(
-    t => t.stateTask === 'done' && t.dateStartTask && t.dateEndRealTask
-  );
-  const dayMs = 1000 * 60 * 60 * 24;
-  const avgCycleDays = completed.length === 0
-    ? 0
-    : completed.reduce((sum, t) => {
-        const start = new Date(t.dateStartTask!).getTime();
-        const end   = new Date(t.dateEndRealTask!).getTime();
-        return sum + Math.max(0, (end - start) / dayMs);
-      }, 0) / completed.length;
-
-  return {
-    progress:        Math.round((done / total) * 100),
-    carryRate:       Math.round((delayed / total) * 100),
-    carriedFeatures: delayed,
-    totalFeatures:   total,
-    taskDelay:       Math.round((overdue / total) * 100),
-    delayedTasks:    overdue,
-    cycleTime:       `${avgCycleDays.toFixed(1)} days`,
-    totalTasks:      total,
-  };
-}
 
 interface SprintInfo {
   id: number;
@@ -196,26 +85,6 @@ function priorityToTone(p: string | null | undefined): PriorityTone {
   }
 }
 
-function mapTaskPriority(p: string | null | undefined): 'high' | 'medium' | 'low' | 'none' {
-  switch ((p ?? '').toLowerCase()) {
-    case 'high':
-      return 'high';
-    case 'medium':
-      return 'medium';
-    case 'low':
-      return 'low';
-    default:
-      return 'none';
-  }
-}
-
-function normalizeTaskState(s: string | null | undefined): 'active' | 'done' | 'delayed' {
-  const state = (s ?? '').toLowerCase();
-  if (state === 'done') return 'done';
-  if (state === 'delayed') return 'delayed';
-  return 'active';
-}
-
 function displayTaskState(s: string | null | undefined): string {
   const state = normalizeTaskState(s);
   if (state === 'done') return 'Done';
@@ -230,34 +99,9 @@ function statusFromProgress(progress: number): { label: string; tone: StatusTone
   return { label: 'Pending', tone: 'neutral' };
 }
 
-/** Display-friendly date: "15 mar 2026" from "2026-03-15". Empty on null. */
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-US', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
-// One mock sprint shared across all sprintIds — the page swaps in the
-// matching name when present, otherwise falls back to "Sprint {id}".
-const MOCK_SPRINT_BASE: Omit<SprintInfo, 'id' | 'name'> = {
-  startDate: '15 mar 2026',
-  endDate:   '29 mar 2026',
-  totalTasks: 0,
-  kpis: {
-    progress: 0,
-    carryRate: 0,
-    carriedFeatures: 0,
-    totalFeatures: 2,
-    taskDelay: 0,
-    delayedTasks: 0,
-    cycleTime: '0.0 days',
-  },
-};
+
+
 
 interface MockFeature {
   id: number;
@@ -292,47 +136,7 @@ const sprintUiPrefsKey = (sid: number) => `${STORAGE_KEYS.CURRENT_SPRINT}_ui_${s
 // components don't need any changes. The MOCK_FEATURES seed data was
 // removed once /api/sprints/{sprId}/features started feeding live data.
 
-// Decorative cycle-time sparkline. Inline because it's specific to this card.
-function Sparkline() {
-  return (
-    <svg
-      viewBox="0 0 100 20"
-      preserveAspectRatio="none"
-      className="w-full h-5"
-      aria-hidden="true"
-    >
-      <path
-        d="M 0 14 Q 25 6, 50 10 T 100 12"
-        fill="none"
-        stroke="#3B82F6"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
 
-/** Linear progress bar used by sprint progress KPI card. */
-function ProgressBar({ value }: { value: number }) {
-  const safe = Math.max(0, Math.min(value, 100));
-
-  return (
-    <div className="space-y-1.5">
-      <div
-        className="w-full h-2.5 rounded-full bg-green-50 border border-green-100 overflow-hidden"
-        role="progressbar"
-        aria-valuenow={safe}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-green-400 via-green-500 to-emerald-600 transition-[width] duration-500"
-          style={{ width: `${safe}%` }}
-        />
-      </div>
-      <div className="text-[11px] text-green-700 font-medium">Progress tracked at {safe}%</div>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
