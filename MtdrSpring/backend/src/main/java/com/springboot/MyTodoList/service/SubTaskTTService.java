@@ -3,8 +3,6 @@ package com.springboot.MyTodoList.service;
 import com.springboot.MyTodoList.model.SubTaskTT;
 import com.springboot.MyTodoList.repository.SubTaskTTRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -44,22 +42,17 @@ public class SubTaskTTService {
     /**
      * Returns a single subtask by its primary key.
      *
-     * @param id  the sub_id to look up
-     * @return 200 OK with subtask body, or 404 NOT FOUND
+     * @param id the sub_id to look up
+     * @return Optional containing the subtask if found
      */
-    public ResponseEntity<SubTaskTT> getSubTaskById(long id) {
-        Optional<SubTaskTT> found = subTaskTTRepository.findById(id);
-        if (found.isPresent()) {
-            return new ResponseEntity<>(found.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Optional<SubTaskTT> getSubTaskById(long id) {
+        return subTaskTTRepository.findById(id);
     }
 
     /**
      * Returns all subtasks under a specific task.
      *
-     * @param taskId  the task to retrieve subtasks for
+     * @param taskId the task to retrieve subtasks for
      */
     public List<SubTaskTT> getSubTasksByTask(long taskId) {
         return subTaskTTRepository.findByTaskId(taskId);
@@ -70,7 +63,7 @@ public class SubTaskTTService {
     /**
      * Creates a new subtask in the database.
      *
-     * @param newSubTask  the SubTaskTT to insert
+     * @param newSubTask the SubTaskTT to insert
      * @return the saved entity with the DB-assigned subId
      */
     public SubTaskTT addSubTask(SubTaskTT newSubTask) {
@@ -80,8 +73,8 @@ public class SubTaskTTService {
     /**
      * Updates an existing subtask's mutable fields.
      *
-     * @param id              the sub_id to update
-     * @param updatedSubTask  object carrying the new field values
+     * @param id             the sub_id to update
+     * @param updatedSubTask object carrying the new field values
      * @return the saved SubTaskTT, or null if not found
      */
     public SubTaskTT updateSubTask(long id, SubTaskTT updatedSubTask) {
@@ -106,7 +99,7 @@ public class SubTaskTTService {
     /**
      * Deletes a subtask by its primary key.
      *
-     * @param id  the sub_id to delete
+     * @param id the sub_id to delete
      * @return true if deleted, false on exception
      */
     public boolean deleteSubTask(long id) {
@@ -124,7 +117,7 @@ public class SubTaskTTService {
      * Calculates the progress of a given task based on its subtasks.
      * Replicates the get_task_progress Oracle SP.
      *
-     * @param taskId  the ID of the main task
+     * @param taskId the ID of the main task
      * @return map with completed, total, and percent values
      */
     public Map<String, Object> getTaskProgress(long taskId) {
@@ -149,13 +142,13 @@ public class SubTaskTTService {
      * Checks if all subtasks of a given task are completed.
      * Replicates the check_subtask_completion Oracle SP.
      *
-     * @param taskId  the ID of the main task
+     * @param taskId the ID of the main task
      * @return true if there are no pending subtasks, false otherwise
      */
     public boolean checkSubTaskCompletion(long taskId) {
         long totalSubs = subTaskTTRepository.countByTaskId(taskId);
         long completedSubs = subTaskTTRepository.countByTaskIdAndStateSub(taskId, "done");
-        
+
         // If they matching, there are no pending subtasks
         return totalSubs > 0 && totalSubs == completedSubs;
     }
@@ -164,8 +157,8 @@ public class SubTaskTTService {
      * Adds a quick subtask with minimal required information.
      * Replicates the add_quick_subtask Oracle SP.
      *
-     * @param taskId  the ID of the main task
-     * @param name    the name of the subtask
+     * @param taskId the ID of the main task
+     * @param name   the name of the subtask
      * @return the created SubTaskTT
      */
     public SubTaskTT addQuickSubTask(long taskId, String name) {
