@@ -3,8 +3,6 @@ package com.springboot.MyTodoList.service;
 import com.springboot.MyTodoList.model.User;
 import com.springboot.MyTodoList.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,48 +14,43 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-    public List<User> findAll(){
+    public List<User> findAll() {
         List<User> users = userRepository.findAll();
         return users;
     }
 
-    public ResponseEntity<User> getUserById(int id){
-        Optional<User> userById = userRepository.findById(id);
-        if (userById.isPresent()){
-            return new ResponseEntity<>(userById.get(), HttpStatus.OK);
-        }else{
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Optional<User> getUserById(int id) {
+        return userRepository.findById(id);
     }
 
-
-    public User addUser(User newUser){
+    public User addUser(User newUser) {
         return userRepository.save(newUser);
     }
 
-    public User test(){
-        User newUser = new User(88,"someNumber","pwd");
+    public User test() {
+        User newUser = new User(88, "someNumber", "pwd");
 
         return userRepository.save(newUser);
     }
 
-    public boolean deleteUser(int id){
-        try{
+    public boolean deleteUser(int id) {
+        try {
             userRepository.deleteById(id);
             return true;
-        }catch(Exception e){
+        } catch (Exception e) {
             return false;
         }
     }
-    public User updateUser(int id, User user2update){
+
+    public User updateUser(int id, User user2update) {
         Optional<User> dbUser = userRepository.findById(id);
-        if(dbUser.isPresent()){
+        if (dbUser.isPresent()) {
             User user = dbUser.get();
             user.setID(id);
             user.setPhoneNumber(user2update.getPhoneNumber());
             user.setUserPassword(user2update.getUserPassword());
             return userRepository.save(user);
-        }else{
+        } else {
             return null;
         }
     }

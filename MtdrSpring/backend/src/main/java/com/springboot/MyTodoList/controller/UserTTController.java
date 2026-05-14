@@ -6,9 +6,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import java.net.URI;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
@@ -18,60 +19,59 @@ public class UserTTController {
     private UserTTService userTTService;
 
     @GetMapping(value = "/users-tt/{id}")
-    public ResponseEntity<?> getUserById(@PathVariable long id) {
-        try {
-            ResponseEntity<UserTT> user = userTTService.getUserById(id);
-            return user;
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-        }
+    public ResponseEntity<UserTT> getUserById(@PathVariable long id) {
+        return userTTService.getUserById(id)
+                .map(user -> new ResponseEntity<>(user, HttpStatus.OK))
+                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @GetMapping(value = "/users-tt")
-    public ResponseEntity<?> getAllUsers() {
+    public ResponseEntity<List<UserTT>> getAllUsers() {
         List<UserTT> users = userTTService.findAll();
         return new ResponseEntity<>(users, HttpStatus.OK);
     }
 
     @GetMapping(value = "/users-tt/telegram/{idTelegram}")
-    public ResponseEntity<?> getUserByTelegram(@PathVariable String idTelegram) {
-        Optional<UserTT> user = userTTService.getUserByTelegram(idTelegram);
-        return user.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
+    public ResponseEntity<UserTT> getUserByTelegram(@PathVariable String idTelegram) {
+        return userTTService.getUserByTelegram(idTelegram)
+                .map(value -> new ResponseEntity<>(value, HttpStatus.OK))
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @GetMapping(value = "/users-tt/role/{role}")
-    public ResponseEntity<?> getUsersByRole(@PathVariable String role) {
+    public ResponseEntity<List<UserTT>> getUsersByRole(@PathVariable String role) {
         List<UserTT> users = userTTService.getUsersByRole(role);
         return new ResponseEntity<>(users, HttpStatus.OK);
     }
 
     @PutMapping(value = "/users-tt/{id}")
-    public ResponseEntity<?> updateUser(@RequestBody UserTT user, @PathVariable long id) {
-        try {
-            UserTT updated = userTTService.updateUser(id, user);
-            if (updated == null) {
-                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(updated, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+    public ResponseEntity<UserTT> updateUser(@RequestBody UserTT user, @PathVariable long id) {
+        UserTT updated = userTTService.updateUser(id, user);
+        if (updated == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+        return new ResponseEntity<>(updated, HttpStatus.OK);
     }
 
     @DeleteMapping(value = "/users-tt/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable long id) {
-        try {
-            Boolean flag = userTTService.deleteUser(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        } catch (Exception e) {
+    public ResponseEntity<Boolean> deleteUser(@PathVariable long id) {
+        boolean flag = userTTService.deleteUser(id);
+        if (flag) {
+            return new ResponseEntity<>(true, HttpStatus.OK);
+        } else {
             return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
         }
     }
 
     @PostMapping(value = "/users-tt")
-    public ResponseEntity<?> addUser(@RequestBody UserTT user) {
+    public ResponseEntity<UserTT> addUser(@RequestBody UserTT user) {
         UserTT saved = userTTService.addUser(user);
-        return new ResponseEntity<>(saved, HttpStatus.OK);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getUserId())
+                .toUri();
+        return ResponseEntity.created(location)
+                .header("Access-Control-Expose-Headers", "Location")
+                .body(saved);
     }
 }

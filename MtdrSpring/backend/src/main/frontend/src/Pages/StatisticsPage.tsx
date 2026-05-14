@@ -14,41 +14,15 @@ import { SprintProgressPieChart, ProjectProgressBox } from '../Components/Sprint
 import CycleTimeScatterPlot from '../Components/Charts/CycleTimeScatterPlot';
 import { getFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
 
-interface ProjectDTO {
-  pjId: number;
-  namePj: string;
-  dateEndRealPj?: string | null;
-}
-
-interface MembershipDTO {
-  pjId: number;
-  userId: number;
-}
-
-interface UserDTO {
-  userId: number;
-  nameUser: string;
-}
-
-interface SprintDTO {
-  sprId: number;
-  nameSprint: string;
-  dateStartSpr: string | null;
-  dateEndSpr: string | null;
-  stateSprint: string | null;
-}
-
-interface SprintTaskDTO {
-  sprId: number;
-  taskId: number;
-  stateTask: string;
-}
-
-interface TaskDTO {
-  taskId: number;
-  userId?: number;
-  storyPoints: number | null;
-}
+import {
+  ProjectDTO,
+  MembershipDTO,
+  UserDTO,
+  SprintDTO,
+  SprintTaskDTO,
+  TaskDTO,
+} from '../Utils/types';
+import { normalizeTaskState } from '../Utils/helpers';
 
 type MetricKey = 'tasksCompleted' | 'storyPointsCompleted';
 
@@ -81,13 +55,6 @@ const BAR_COLORS = [
   '#9333EA',
   '#D97706',
 ];
-
-function normalizeTaskState(raw: string | null | undefined): 'active' | 'done' | 'delayed' {
-  const s = (raw ?? '').toLowerCase();
-  if (s === 'done') return 'done';
-  if (s === 'delayed') return 'delayed';
-  return 'active';
-}
 
 function buildYAxisTicks(maxValue: number): number[] {
   if (maxValue <= 0) return [0, 1, 2, 3, 4];

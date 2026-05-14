@@ -3,9 +3,12 @@ package com.springboot.MyTodoList.repository;
 import com.springboot.MyTodoList.model.SprintTT;
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -67,4 +70,24 @@ public interface SprintTTRepository extends JpaRepository<SprintTT, Long> {
      *   called with stateSprint = "active"
      */
     Optional<SprintTT> findByPjIdAndStateSprint(long pjId, String stateSprint);
+
+    /*
+     * All non-done sprints for a project except the one being closed.
+     * Used by closeSprintAndActivateNext() to find the nearest next sprint.
+     *
+     * Generated SQL:
+     *   SELECT * FROM sprint_tt
+     *   WHERE pj_id = ? AND spr_id <> ? AND state_sprint <> 'done'
+     */
+    List<SprintTT> findByPjIdAndSprIdNotAndStateSprintNot(long pjId, long excludeId, String excludeState);
+
+    /*
+     * Active sprints whose end date is strictly before today.
+     * Used by the daily scheduler to auto-close expired sprints
+     * for projects with autoCloseSprints = true.
+     *
+     * JPQL — joins to PROJECT_TT via pjId field on SprintTT.
+     */
+    @Query("SELECT s FROM SprintTT s WHERE s.stateSprint = 'active' AND s.dateEndSpr < :today")
+    List<SprintTT> findExpiredActiveSprints(@Param("today") LocalDate today);
 }
