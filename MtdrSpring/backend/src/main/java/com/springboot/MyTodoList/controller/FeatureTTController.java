@@ -3,10 +3,11 @@ package com.springboot.MyTodoList.controller;
 import com.springboot.MyTodoList.model.FeatureTT;
 import com.springboot.MyTodoList.service.FeatureTTService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import java.net.URI;
 
 import java.util.List;
 
@@ -24,7 +25,9 @@ public class FeatureTTController {
 
     @GetMapping("/features/{id}")
     public ResponseEntity<FeatureTT> getFeatureById(@PathVariable long id) {
-        return featureTTService.getFeatureById(id);
+        return featureTTService.getFeatureById(id)
+                .map(feature -> new ResponseEntity<>(feature, HttpStatus.OK))
+                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @GetMapping("/features/sprint/{sprId}")
@@ -39,26 +42,21 @@ public class FeatureTTController {
 
     @PostMapping("/features")
     public ResponseEntity<FeatureTT> addFeature(@RequestBody FeatureTT feature) {
-        try {
-            FeatureTT saved = featureTTService.addFeature(feature);
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("location", "" + saved.getFeatureId());
-            headers.set("Access-Control-Expose-Headers", "location");
-            return ResponseEntity.ok().headers(headers).build();
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
+        FeatureTT saved = featureTTService.addFeature(feature);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getFeatureId())
+                .toUri();
+        return ResponseEntity.created(location)
+                .header("Access-Control-Expose-Headers", "Location")
+                .body(saved);
     }
 
     @PutMapping("/features/{id}")
     public ResponseEntity<FeatureTT> updateFeature(@RequestBody FeatureTT feature, @PathVariable long id) {
-        try {
-            FeatureTT updated = featureTTService.updateFeature(id, feature);
-            if (updated == null) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            return new ResponseEntity<>(updated, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        FeatureTT updated = featureTTService.updateFeature(id, feature);
+        if (updated == null) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        return new ResponseEntity<>(updated, HttpStatus.OK);
     }
 
     @DeleteMapping("/features/{id}")

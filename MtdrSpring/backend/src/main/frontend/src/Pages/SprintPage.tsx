@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowTrendingUpIcon,
   CalendarIcon,
   CheckCircleIcon,
   ClockIcon,
   ExclamationCircleIcon,
+  StopIcon,
 } from '@heroicons/react/24/outline';
 import { KpiCard } from '../Components/Team'; // shared visual primitive — promote to /Common if it spreads further
 import {
@@ -30,137 +31,28 @@ import type { StatusTone } from '../Components/Sprint';
 import TaskDetailModal from '../Components/Common/TaskDetailModal';
 import type { TaskDetailData } from '../Components/Common/TaskDetailModal';
 import PageLoading from '../Components/Common/PageLoading';
+import ProgressBar from '../Components/Common/ProgressBar';
+import Sparkline from '../Components/Common/Sparkline';
 import { getFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
+import { toast } from '../Utils/toast';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock data — visual-only until the sprint endpoints are wired.
 // All MOCK_* lives at the top so the swap to real hooks is mechanical.
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface ProjectDTO {
-  pjId: number;
-  namePj: string;
-}
+import {
+  ProjectDTO,
+  SprintDTO,
+  SprintTaskDTO,
+  TaskDTO,
+  FeatureDTO,
+} from '../Utils/types';
+import { mapTaskPriority, normalizeTaskState, formatDate } from '../Utils/helpers';
+import { MOCK_SPRINT_BASE } from '../Utils/mockData';
+import { SprintTaskJoined, ComputedKpis, computeSprintKpis } from '../Utils/kpiUtils';
 
-/** Backend SprintTT shape — only the fields this page consumes. */
-interface SprintDTO {
-  sprId: number;
-  nameSprint: string;
-  dateStartSpr: string | null;
-  dateEndSpr: string | null;
-  taskGoal: number | null;
-  stateSprint: string;
-  pjId: number;
-}
 
-/** Backend SprintTaskTT shape — the junction table row + workflow state. */
-interface SprintTaskDTO {
-  sprId: number;
-  taskId: number;
-  /** 'active' | 'done' | 'delayed' (Oracle CHECK constraint). */
-  stateTask: string;
-}
-
-/** Backend TaskTT shape — fields used for KPIs, features, and task detail. */
-interface TaskDTO {
-  taskId: number;
-  nameTask?: string | null;
-  /** Long-text description of the task (TaskTT.infoTask, max 2000 chars). */
-  infoTask?: string | null;
-  priority?: string | null;
-  storyPoints: number | null;
-  dateStartTask: string | null;
-  dateEndSetTask: string | null;
-  dateEndRealTask: string | null;
-  userId?: number;
-  featureId?: number | null;
-}
-
-/** Backend FeatureTT shape. */
-interface FeatureDTO {
-  featureId: number;
-  nameFeature: string;
-  priorityFeature: string | null;
-  descriptionFeature: string | null;
-  sprId: number;
-}
-
-/** Joined view: a task with its workflow state inside the sprint. */
-interface SprintTaskJoined extends TaskDTO {
-  stateTask: string;
-}
-
-/** Computed KPIs for the sprint header cards. */
-interface ComputedKpis {
-  progress: number;
-  carryRate: number;
-  carriedFeatures: number;
-  totalFeatures: number;
-  taskDelay: number;
-  delayedTasks: number;
-  cycleTime: string;
-  totalTasks: number;
-}
-
-const ZERO_KPIS: ComputedKpis = {
-  progress: 0,
-  carryRate: 0,
-  carriedFeatures: 0,
-  totalFeatures: 0,
-  taskDelay: 0,
-  delayedTasks: 0,
-  cycleTime: '0.0 days',
-  totalTasks: 0,
-};
-
-/**
- * Derive the four sprint KPIs from the joined task list. All math lives in
- * the frontend because the backend exposes only `totalPoints + taskCount`
- * via /metrics — not enough for progress, carry rate, delay, or cycle time.
- *
- * Definitions (matching the screenshot semantics):
- *   - progress   = % of tasks marked 'done'
- *   - carryRate  = % of tasks marked 'delayed' at sprint close
- *   - taskDelay  = % of non-done tasks past their planned end date today
- *   - cycleTime  = average days between dateStartTask and dateEndRealTask
- *                  for tasks marked 'done'
- */
-function computeSprintKpis(tasks: SprintTaskJoined[]): ComputedKpis {
-  const total = tasks.length;
-  if (total === 0) return ZERO_KPIS;
-
-  const done    = tasks.filter(t => t.stateTask === 'done').length;
-  const delayed = tasks.filter(t => t.stateTask === 'delayed').length;
-
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const overdue = tasks.filter(
-    t => t.stateTask !== 'done' && t.dateEndSetTask != null && t.dateEndSetTask < todayIso
-  ).length;
-
-  // Cycle time only meaningful for tasks that actually closed.
-  const completed = tasks.filter(
-    t => t.stateTask === 'done' && t.dateStartTask && t.dateEndRealTask
-  );
-  const dayMs = 1000 * 60 * 60 * 24;
-  const avgCycleDays = completed.length === 0
-    ? 0
-    : completed.reduce((sum, t) => {
-        const start = new Date(t.dateStartTask!).getTime();
-        const end   = new Date(t.dateEndRealTask!).getTime();
-        return sum + Math.max(0, (end - start) / dayMs);
-      }, 0) / completed.length;
-
-  return {
-    progress:        Math.round((done / total) * 100),
-    carryRate:       Math.round((delayed / total) * 100),
-    carriedFeatures: delayed,
-    totalFeatures:   total,
-    taskDelay:       Math.round((overdue / total) * 100),
-    delayedTasks:    overdue,
-    cycleTime:       `${avgCycleDays.toFixed(1)} days`,
-    totalTasks:      total,
-  };
-}
 
 interface SprintInfo {
   id: number;
@@ -195,26 +87,6 @@ function priorityToTone(p: string | null | undefined): PriorityTone {
   }
 }
 
-function mapTaskPriority(p: string | null | undefined): 'high' | 'medium' | 'low' | 'none' {
-  switch ((p ?? '').toLowerCase()) {
-    case 'high':
-      return 'high';
-    case 'medium':
-      return 'medium';
-    case 'low':
-      return 'low';
-    default:
-      return 'none';
-  }
-}
-
-function normalizeTaskState(s: string | null | undefined): 'active' | 'done' | 'delayed' {
-  const state = (s ?? '').toLowerCase();
-  if (state === 'done') return 'done';
-  if (state === 'delayed') return 'delayed';
-  return 'active';
-}
-
 function displayTaskState(s: string | null | undefined): string {
   const state = normalizeTaskState(s);
   if (state === 'done') return 'Done';
@@ -229,34 +101,9 @@ function statusFromProgress(progress: number): { label: string; tone: StatusTone
   return { label: 'Pending', tone: 'neutral' };
 }
 
-/** Display-friendly date: "15 mar 2026" from "2026-03-15". Empty on null. */
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-US', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
-// One mock sprint shared across all sprintIds — the page swaps in the
-// matching name when present, otherwise falls back to "Sprint {id}".
-const MOCK_SPRINT_BASE: Omit<SprintInfo, 'id' | 'name'> = {
-  startDate: '15 mar 2026',
-  endDate:   '29 mar 2026',
-  totalTasks: 0,
-  kpis: {
-    progress: 0,
-    carryRate: 0,
-    carriedFeatures: 0,
-    totalFeatures: 2,
-    taskDelay: 0,
-    delayedTasks: 0,
-    cycleTime: '0.0 days',
-  },
-};
+
+
 
 interface MockFeature {
   id: number;
@@ -291,47 +138,7 @@ const sprintUiPrefsKey = (sid: number) => `${STORAGE_KEYS.CURRENT_SPRINT}_ui_${s
 // components don't need any changes. The MOCK_FEATURES seed data was
 // removed once /api/sprints/{sprId}/features started feeding live data.
 
-// Decorative cycle-time sparkline. Inline because it's specific to this card.
-function Sparkline() {
-  return (
-    <svg
-      viewBox="0 0 100 20"
-      preserveAspectRatio="none"
-      className="w-full h-5"
-      aria-hidden="true"
-    >
-      <path
-        d="M 0 14 Q 25 6, 50 10 T 100 12"
-        fill="none"
-        stroke="#3B82F6"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
 
-/** Linear progress bar used by sprint progress KPI card. */
-function ProgressBar({ value }: { value: number }) {
-  const safe = Math.max(0, Math.min(value, 100));
-
-  return (
-    <div className="space-y-1.5">
-      <div
-        className="w-full h-2.5 rounded-full bg-green-50 border border-green-100 overflow-hidden"
-        role="progressbar"
-        aria-valuenow={safe}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-green-400 via-green-500 to-emerald-600 transition-[width] duration-500"
-          style={{ width: `${safe}%` }}
-        />
-      </div>
-      <div className="text-[11px] text-green-700 font-medium">Progress tracked at {safe}%</div>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
@@ -344,6 +151,7 @@ export default function SprintPage() {
   }>();
   const projectId = rawProjectId ? Number(rawProjectId) : undefined;
   const sprintId = rawSprintId ? Number(rawSprintId) : undefined;
+  const navigate = useNavigate();
 
   // Resolve project name from the cached project list (filled by the sidebar).
   // When backend wiring lands this becomes a fetch keyed by projectId.
@@ -385,6 +193,12 @@ export default function SprintPage() {
   // When non-null, the AddTaskModal opens in edit mode preloaded with this
   // task's values. Mutually exclusive with showAddTaskModal in practice.
   const [taskToEdit, setTaskToEdit] = useState<SprintTaskJoined | null>(null);
+
+  // autoCloseSprints setting for the current project — if false, show manual
+  // "Terminar Sprint" button on active sprints.
+  const [autoCloseSprints, setAutoCloseSprints] = useState<boolean>(true); // optimistic default hides button until fetched
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [endingsprint, setEndingSprint] = useState(false);
 
   useEffect(() => {
     if (sprintId == null || sprintId < 0) {
@@ -447,6 +261,49 @@ export default function SprintPage() {
       cancelled = true;
     };
   }, [sprintId, taskRefreshToken]);
+
+  // Fetch project autoCloseSprints so we know whether to show the manual
+  // "Terminar Sprint" button. Runs whenever the sprint's pjId is known.
+  useEffect(() => {
+    const pid = sprintDto?.pjId ?? projectId;
+    if (pid == null || pid < 0) return;
+    let cancelled = false;
+    fetch(`/api/projects/${pid}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: ProjectDTO | null) => {
+        if (cancelled || !data) return;
+        setAutoCloseSprints(data.autoCloseSprints ?? false);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [sprintDto?.pjId, projectId]);
+
+  // Handler for the "Terminar Sprint" button
+  const handleEndSprint = useCallback(async () => {
+    if (!sprintId) return;
+    setEndingSprint(true);
+    try {
+      const res = await fetch(`/api/sprints/${sprintId}/end`, { method: 'PATCH' });
+      if (!res.ok && res.status !== 204) {
+        toast('Failed to end sprint', 'error');
+        return;
+      }
+      // If a next sprint was activated, navigate there; otherwise go to project
+      if (res.status === 200) {
+        const next = await res.json() as { sprId: number };
+        toast('Sprint closed — next sprint activated');
+        navigate(`/projects/${projectId}/sprints/${next.sprId}`);
+      } else {
+        toast('Sprint closed — no next sprint found');
+        navigate(`/projects/${projectId}`);
+      }
+    } catch {
+      toast('Failed to end sprint', 'error');
+    } finally {
+      setEndingSprint(false);
+      setShowEndConfirm(false);
+    }
+  }, [sprintId, projectId, navigate]);
 
   // One-time fetch of all users for the developer-name lookup. Lives across
   // sprint navigations (deps: []) — same map serves every feature row.
@@ -905,21 +762,68 @@ export default function SprintPage() {
       ) : (
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <header>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {projectName} - {sprint.name}
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500 mt-2">
-            <span className="inline-flex items-center gap-1.5">
-              <CalendarIcon className="h-4 w-4" aria-hidden="true" />
-              {sprint.startDate} - {sprint.endDate}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <CheckCircleIcon className="h-4 w-4" aria-hidden="true" />
-              {sprint.totalTasks} total tasks
-            </span>
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {projectName} - {sprint.name}
+            </h1>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500 mt-2">
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarIcon className="h-4 w-4" aria-hidden="true" />
+                {sprint.startDate} - {sprint.endDate}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircleIcon className="h-4 w-4" aria-hidden="true" />
+                {sprint.totalTasks} total tasks
+              </span>
+            </div>
           </div>
+
+          {/* "Terminar Sprint" — visible only when sprint is active, has started, and autoCloseSprints=false */}
+          {sprintDto?.stateSprint === 'active'
+            && !autoCloseSprints
+            && sprintDto.dateStartSpr != null
+            && new Date(sprintDto.dateStartSpr) <= new Date()
+            && (
+            <button
+              type="button"
+              onClick={() => setShowEndConfirm(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors"
+            >
+              <StopIcon className="h-4 w-4" />
+              Terminar Sprint
+            </button>
+          )}
         </header>
+
+        {/* Terminar Sprint — confirm dialog */}
+        {showEndConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
+              <h2 className="text-xl font-bold text-gray-900">Terminar Sprint</h2>
+              <p className="mt-3 text-sm text-gray-500">
+                ¿Seguro que quieres cerrar <span className="font-semibold text-gray-700">{sprint.name}</span>?
+                El siguiente sprint más próximo se activará automáticamente.
+              </p>
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setShowEndConfirm(false)}
+                  disabled={endingsprint}
+                  className="flex-1 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleEndSprint}
+                  disabled={endingsprint}
+                  className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {endingsprint ? 'Cerrando…' : 'Sí, terminar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Sprint KPIs */}
         <section

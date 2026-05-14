@@ -3,8 +3,6 @@ package com.springboot.MyTodoList.repository;
 import com.springboot.MyTodoList.model.SubTaskTT;
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
@@ -27,7 +25,7 @@ public interface SubTaskTTRepository extends JpaRepository<SubTaskTT, Long> {
      * All subtasks for a specific main task.
      *
      * Generated SQL:
-     *   SELECT * FROM subtask_tt WHERE task_id = ?
+     * SELECT * FROM subtask_tt WHERE task_id = ?
      */
     List<SubTaskTT> findByTaskId(long taskId);
 
@@ -35,7 +33,7 @@ public interface SubTaskTTRepository extends JpaRepository<SubTaskTT, Long> {
      * Count total subtasks for a specific main task.
      *
      * Equivalent to:
-     *   SELECT COUNT(*) FROM subtask_tt WHERE task_id = p_task_id;
+     * SELECT COUNT(*) FROM subtask_tt WHERE task_id = p_task_id;
      */
     long countByTaskId(long taskId);
 
@@ -43,7 +41,8 @@ public interface SubTaskTTRepository extends JpaRepository<SubTaskTT, Long> {
      * Count subtasks for a specific main task by their state.
      *
      * Equivalent to:
-     *   SELECT COUNT(*) FROM subtask_tt WHERE task_id = p_task_id AND state_sub = 'done';
+     * SELECT COUNT(*) FROM subtask_tt WHERE task_id = p_task_id AND state_sub =
+     * 'done';
      */
     long countByTaskIdAndStateSub(long taskId, String stateSub);
 }

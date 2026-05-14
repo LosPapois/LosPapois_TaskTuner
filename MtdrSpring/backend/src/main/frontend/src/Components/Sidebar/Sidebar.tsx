@@ -26,6 +26,8 @@ interface ProjectDTO {
   dateStartPj?: string | null;
   dateEndSetPj?: string | null;
   dateEndRealPj?: string | null;
+  autoRollover?: boolean;
+  autoCloseSprints?: boolean;
 }
 
 interface SessionUser {
@@ -153,6 +155,34 @@ function Sidebar({ isOpen }: SidebarProps) {
     [addSprintFor]
   );
 
+  const handleProjectClosed = useCallback((projectId: number) => {
+    setProjects(prev => {
+      const updated = prev.map(p =>
+        p.pjId === projectId ? { ...p, dateEndRealPj: new Date().toISOString().slice(0, 10) } : p
+      );
+      saveToStorage(STORAGE_KEYS.PROJECTS, updated);
+      return updated;
+    });
+  }, []);
+
+  const handleProjectDeleted = useCallback((projectId: number) => {
+    setProjects(prev => {
+      const updated = prev.filter(p => p.pjId !== projectId);
+      saveToStorage(STORAGE_KEYS.PROJECTS, updated);
+      return updated;
+    });
+  }, []);
+
+  const handleProjectUpdated = useCallback((projectId: number, name: string, autoRollover: boolean, autoCloseSprints: boolean) => {
+    setProjects(prev => {
+      const updated = prev.map(p =>
+        p.pjId === projectId ? { ...p, namePj: name, autoRollover, autoCloseSprints } : p
+      );
+      saveToStorage(STORAGE_KEYS.PROJECTS, updated);
+      return updated;
+    });
+  }, []);
+
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [addProjectSubmitting, setAddProjectSubmitting] = useState(false);
   const [addProjectError, setAddProjectError] = useState<string | null>(null);
@@ -268,11 +298,14 @@ function Sidebar({ isOpen }: SidebarProps) {
                 key={p.pjId}
                 projectId={p.pjId}
                 projectName={p.namePj}
-                // Open the first project by default so the new structure is
-                // discoverable on first paint. Subsequent groups stay collapsed.
+                autoRollover={p.autoRollover ?? false}
+                autoCloseSprints={p.autoCloseSprints ?? false}
                 defaultOpen={idx === 0}
                 onAddSprint={openAddSprint}
                 refreshToken={sprintVersions[p.pjId] ?? 0}
+                onProjectClosed={handleProjectClosed}
+                onProjectDeleted={handleProjectDeleted}
+                onProjectUpdated={handleProjectUpdated}
               />
             ))
           )}

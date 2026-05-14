@@ -13,9 +13,7 @@ import ProjectsPage from './Pages/ProjectsPage';
 import { Sidebar, SidebarToggle } from './Components/Sidebar';
 import PageBreadcrumb from './Components/Header/PageBreadcrumb';
 import HomeButton from './Components/Header/HomeButton';
-// Old top-bar Navigation kept importable in case we need to revert quickly,
-// but it is no longer rendered — Sidebar replaces it.
-// import Navigation from './Components/Navigation';
+
 import {
   getFromStorage,
   saveToStorage,
