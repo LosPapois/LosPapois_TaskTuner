@@ -7,13 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
-import com.springboot.MyTodoList.security.ApiSecurityFilter;
 import org.springframework.web.bind.annotation.RequestBody;
-import com.springboot.MyTodoList.security.ApiSecurityFilter;
 import org.springframework.web.bind.annotation.RequestMapping;
-import com.springboot.MyTodoList.security.ApiSecurityFilter;
 import org.springframework.web.bind.annotation.RestController;
-import com.springboot.MyTodoList.security.ApiSecurityFilter;
 
 import com.springboot.MyTodoList.dto.LoginRequest;
 import com.springboot.MyTodoList.dto.RegisterRequest;
@@ -34,18 +30,17 @@ public class AuthController {
             UserTT u = optionalUser.get();
             String token = java.util.UUID.randomUUID().toString();
             com.springboot.MyTodoList.security.ApiSecurityFilter.VALID_TOKENS.add(token);
-            
+
             return ResponseEntity.ok(Map.of(
-                "token", token,
-                "userId", u.getUserId(),
-                "nameUser", u.getNameUser(),
-                "mail", u.getMail() != null ? u.getMail() : "",
-                "role", u.getRole(),
-                "idTelegram", u.getIdTelegram()
-            ));
+                    "token", token,
+                    "userId", u.getUserId(),
+                    "nameUser", u.getNameUser(),
+                    "mail", u.getMail() != null ? u.getMail() : "",
+                    "role", u.getRole(),
+                    "idTelegram", u.getIdTelegram()));
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(Map.of("error", "Incorrect email or password."));
+                .body(Map.of("error", "Incorrect email or password."));
     }
 
     @PostMapping("/register")
