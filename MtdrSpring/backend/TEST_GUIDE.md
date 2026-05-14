@@ -1,72 +1,40 @@
-# Test guide — updated to reflect current test schema
+# Test guide — BotActions test suite
 
-This file documents the current JUnit test layout, what each test file covers, and quick commands to run tests locally.
+This file documents the JUnit test suite, which focuses on the Telegram bot's core behaviors.
 
-Top-level guidance
-- Unit tests target service business logic (Mockito + JUnit 5).
-- Controller tests use Spring's WebMvc test slice with mocked service beans.
-- KPI tests validate mapping logic (repository rows → service DTOs) using mocked repositories.
-
-Current test files
-- `src/test/java/com/springboot/MyTodoList/service/TaskTTServiceTest.java`
-  - Unit coverage for task lifecycle: create, update, delete, and `safeAssignTask()` (membership validation).
-
+Current test coverage
 - `src/test/java/com/springboot/MyTodoList/service/BotTaskAdditionIntegrationTest.java`
-  - Consolidated bot-action suite (`BotActionsTest`) that covers the Telegram entry points, state transitions, task creation, task completion/reopen, edit pickers, AI prompts, import prompts, and fallback actions.
-
-- `src/test/java/com/springboot/MyTodoList/service/SprintTaskTTServiceTest.java`
-  - Tests for sprint-task junction behavior: addTaskToSprint, updateTaskState, removeTaskFromSprint.
-
-- `src/test/java/com/springboot/MyTodoList/service/KpisServiceTest.java`
-  - Verifies mapping of raw repository rows into KPI response structures (velocity, completitud, etc.).
-
-- `src/test/java/com/springboot/MyTodoList/controller/TaskTTControllerTest.java`
-  - Web-slice tests for task listing endpoints: `/api/tasks`, `/api/projects/{pjId}/tasks`.
-
-- `src/test/java/com/springboot/MyTodoList/controller/KpisControllerTest.java`
-  - Web-slice tests for KPI endpoints: `/api/projects/{pjId}/kpis/*`, `/api/features/{featureId}/kpis/*`.
-
-Notes
-- The codebase exposes KPI endpoints for velocity, retrabajo, carga-equipo and completitud. There is no dedicated "cycle time" endpoint present by name; use the available KPI endpoints for dashboard needs.
-- Tests are written to avoid starting the full application (use mocks / WebMvc slice), so they run quickly in CI.
+  - Contains the consolidated `BotActionsTest` suite that verifies the Telegram entry points, state transitions, task creation, task completion/reopen, edit pickers, AI prompts, import flows, and fallback actions.
+  - Tests use Mockito to mock services (TaskService, UserService, etc.) and the Telegram client, allowing unit-test-style verification without a live bot or external APIs.
+  - Includes test helpers to reset bot static state between tests and factory methods for creating `BotActions` instances with custom request text.
 
 Quick commands
 
-Run all tests (from repository root):
+Run the BotActions test suite (from MtdrSpring/backend):
 ```bash
-cd MtdrSpring/backend
+mvn -Dtest=BotActionsTest test
+```
+
+Run a single bot test method:
+```bash
+mvn -Dtest=BotActionsTest#testStartCommand test
+```
+
+Run all tests with verbose output:
+```bash
 mvn test
 ```
 
-Run a focused test class:
-```bash
-mvn -Dtest=com.springboot.MyTodoList.service.TaskTTServiceTest test
-```
-
-Run a single test method:
-```bash
-mvn -Dtest=com.springboot.MyTodoList.service.TaskTTServiceTest#addTask_saves_the_new_task test
-```
-
-Run controller/web-slice tests only:
-```bash
-mvn -Dtest=com.springboot.MyTodoList.controller.*Test test
-```
-
 Notes about test setup
-- Tests use Mockito and Spring test utilities — no external DB or Telegram API is required.
-- A small number of tests include `@SuppressWarnings("null")` in test scope to satisfy static null-safety checks; this does not affect runtime behavior.
+- Tests use Mockito and JUnit 5 — no external DB, Telegram API, or live bot is required.
+- The test suite resets bot static state between test cases to ensure isolation and predictable test behavior.
+- Tests verify end-to-end bot conversation flows: user sends command → bot state updates → bot sends response.
 
 Recent run (local)
-- Focused service + controller test run: 25 tests passed, 0 failed.
+- BotActionsTest: 14 tests passed, 0 failed.
 
-Recommended next steps
-1. Add controller tests for create/update/delete endpoints to exercise request/response contracts end-to-end.
-2. Add one integration profile using H2 to exercise repository queries against a real DB for KPI SQL verification.
-3. Add a CI workflow (GitHub Actions or other) that runs `mvn test` and publishes a JaCoCo coverage report.
-
-Want me to proceed?
-- I can add a minimal H2 integration test and profile, or
-- create a GitHub Actions CI snippet that runs tests and publishes coverage.
+Test execution in CI
+- The GitHub Actions workflow [.github/workflows/run-bot-tests.yml](.github/workflows/run-bot-tests.yml) runs the BotActionsTest suite on push and pull requests targeting the `JUnitTests` branch.
+- The workflow uses `CI=false ./mvnw -Dtest=BotActionsTest test` to ensure consistent behavior across local and CI environments.
 
 File: [TEST_GUIDE.md](TEST_GUIDE.md)
