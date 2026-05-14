@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export type TaskDetailPriority = 'high' | 'medium' | 'low' | 'none';
 
@@ -31,6 +31,11 @@ export interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   task: TaskDetailData | null;
+  /**
+   * When provided, an "Edit" button is rendered in the footer. The parent
+   * is expected to close this modal and open its own edit form on click.
+   */
+  onEdit?: () => void;
 }
 
 /**
@@ -41,6 +46,7 @@ export default function TaskDetailModal({
   isOpen,
   onClose,
   task,
+  onEdit,
 }: TaskDetailModalProps) {
   // Escape pattern shared with AddSprintModal
   useEffect(() => {
@@ -135,7 +141,16 @@ export default function TaskDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-brand text-white rounded-xl font-semibold hover:bg-brand-dark transition-colors shadow-sm"
+            >
+              <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
+              Edit
+            </button>
+          )}
           <button
             onClick={onClose}
             className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors shadow-sm"
