@@ -2,9 +2,9 @@ name: Run BotActions tests
 
 on:
   push:
-    branches: [ JUnitTests ]
+    branches: [ "development" ]
   pull_request:
-    branches: [ JUnitTests ]
+    branches: [ "development" ]
 
 jobs:
   test:
