@@ -23,6 +23,9 @@ export type {
 export { default as AddSprintModal } from './AddSprintModal';
 export type { AddSprintModalProps, NewSprintData } from './AddSprintModal';
 
+export { default as AddTaskModal } from './AddTaskModal';
+export type { AddTaskModalProps, NewTaskData, NewTaskPriority } from './AddTaskModal';
+
 export { default as DeveloperTaskBoard } from './DeveloperTaskBoard';
 export type {
   DeveloperTaskBoardProps,

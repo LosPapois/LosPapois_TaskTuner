@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { KpiCard } from '../Components/Team'; // shared visual primitive — promote to /Common if it spreads further
 import {
+  AddTaskModal,
   DeveloperTaskBoard,
   FeatureDetailPanel,
   FeatureFilters,
@@ -22,6 +23,7 @@ import type {
   FeatureDetailData,
   FilterKey,
   FilterValues,
+  NewTaskData,
   PriorityTone,
   TaskBoardMode,
 } from '../Components/Sprint';
@@ -183,6 +185,15 @@ export default function SprintPage() {
   const [usersLoading, setUsersLoading] = useState(true);
   const [contentView, setContentView] = useState<SprintContentView>('features');
 
+  // Add-Task modal — open state + a bump counter used as a useEffect dep so
+  // creating/editing a task forces a re-fetch of the sprint's task list
+  // without duplicating the whole load logic.
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [taskRefreshToken, setTaskRefreshToken] = useState(0);
+  // When non-null, the AddTaskModal opens in edit mode preloaded with this
+  // task's values. Mutually exclusive with showAddTaskModal in practice.
+  const [taskToEdit, setTaskToEdit] = useState<SprintTaskJoined | null>(null);
+
   // autoCloseSprints setting for the current project — if false, show manual
   // "Terminar Sprint" button on active sprints.
   const [autoCloseSprints, setAutoCloseSprints] = useState<boolean>(true); // optimistic default hides button until fetched
@@ -249,7 +260,7 @@ export default function SprintPage() {
     return () => {
       cancelled = true;
     };
-  }, [sprintId]);
+  }, [sprintId, taskRefreshToken]);
 
   // Fetch project autoCloseSprints so we know whether to show the manual
   // "Terminar Sprint" button. Runs whenever the sprint's pjId is known.
@@ -620,13 +631,126 @@ export default function SprintPage() {
     });
   };
 
+  /**
+   * Handles both create and edit submissions from AddTaskModal.
+   *
+   * Create flow:  POST /api/tasks  →  POST /api/sprint-tasks (link to sprint)
+   * Edit flow:    PUT  /api/tasks/{id}  (sprint link stays the same)
+   *
+   * Throws on failure so the modal can show the error and keep the form open.
+   * Bumps taskRefreshToken on success to trigger the sprint reload effect.
+   */
+  const handleSubmitTask = async (data: NewTaskData): Promise<void> => {
+    if (projectId == null || sprintId == null) {
+      throw new Error('Missing projectId or sprintId');
+    }
+
+    // ── EDIT ──────────────────────────────────────────────────────────
+    if (taskToEdit) {
+      // PUT body must include the full TaskTT shape since updateTask sets
+      // every field from the request body. We preserve fields the modal
+      // doesn't touch (dateStartTask, dateEndRealTask, featureId).
+      const putBody = {
+        taskId:          taskToEdit.taskId,
+        nameTask:        data.nameTask,
+        infoTask:        data.infoTask ?? null,
+        priority:        data.priority,
+        storyPoints:     data.storyPoints ?? null,
+        userId:          data.userId,
+        pjId:            projectId,
+        dateStartTask:   taskToEdit.dateStartTask,
+        dateEndSetTask:  data.dateEndSetTask ?? null,
+        dateEndRealTask: taskToEdit.dateEndRealTask,
+        featureId:       taskToEdit.featureId ?? null,
+      };
+      const putRes = await fetch(`/api/tasks/${taskToEdit.taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(putBody),
+      });
+      if (!putRes.ok) {
+        throw new Error(`PUT /api/tasks/${taskToEdit.taskId} → ${putRes.status}`);
+      }
+      setTaskRefreshToken(t => t + 1);
+      return;
+    }
+
+    // ── CREATE ────────────────────────────────────────────────────────
+    // 1) Create the task.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const createBody = {
+      nameTask:       data.nameTask,
+      infoTask:       data.infoTask ?? null,
+      priority:       data.priority,
+      storyPoints:    data.storyPoints ?? null,
+      userId:         data.userId,
+      pjId:           projectId,
+      dateStartTask:  todayIso,
+      dateEndSetTask: data.dateEndSetTask ?? null,
+    };
+    const createRes = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(createBody),
+    });
+    if (!createRes.ok) {
+      throw new Error(`POST /api/tasks → ${createRes.status}`);
+    }
+
+    // The controller returns the new taskId in the `location` header it
+    // explicitly exposes via Access-Control-Expose-Headers.
+    const newTaskIdHeader = createRes.headers.get('location');
+    const newTaskId = newTaskIdHeader ? Number(newTaskIdHeader) : NaN;
+    if (!Number.isFinite(newTaskId) || newTaskId <= 0) {
+      throw new Error('Backend did not return a taskId in the location header');
+    }
+
+    // 2) Link the new task to this sprint. The backend defaults stateTask
+    // to 'active' when not provided.
+    const linkUrl = `/api/sprint-tasks?sprId=${sprintId}&taskId=${newTaskId}`;
+    const linkRes = await fetch(linkUrl, { method: 'POST' });
+    if (!linkRes.ok) {
+      throw new Error(`POST /api/sprint-tasks → ${linkRes.status}`);
+    }
+
+    setTaskRefreshToken(t => t + 1);
+  };
+
+  /**
+   * Triggered by clicking "Edit" inside TaskDetailModal. Looks up the raw
+   * DTO from the joined sprint tasks (TaskDetailData is a view-model that
+   * doesn't carry every backend field), then swaps modals.
+   */
+  const handleStartEdit = () => {
+    if (!selectedTaskForModal) return;
+    const raw = sprintTasks.find(t => t.taskId === selectedTaskForModal.id);
+    if (!raw) return;
+    setTaskToEdit(raw);
+    setSelectedTaskForModal(null);
+  };
+
   return (
     <div className="bg-gray-50 min-h-full px-6 py-8">
       <TaskDetailModal
         isOpen={selectedTaskForModal !== null}
         onClose={() => setSelectedTaskForModal(null)}
         task={selectedTaskForModal}
+        onEdit={handleStartEdit}
       />
+
+      {projectId != null && (
+        <AddTaskModal
+          isOpen={showAddTaskModal || taskToEdit !== null}
+          onClose={() => {
+            setShowAddTaskModal(false);
+            setTaskToEdit(null);
+          }}
+          projectId={projectId}
+          usersById={usersById}
+          onCreate={handleSubmitTask}
+          initialTask={taskToEdit}
+        />
+      )}
 
       {isPageLoading ? (
         <div className="max-w-7xl mx-auto">
@@ -765,29 +889,46 @@ export default function SprintPage() {
             Sprint Status
           </h2>
 
-          <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setContentView('features')}
-              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                contentView === 'features'
-                  ? 'bg-brand text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Feature View
-            </button>
-            <button
-              type="button"
-              onClick={() => setContentView('developers')}
-              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                contentView === 'developers'
-                  ? 'bg-brand text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Task View
-            </button>
+          {/* Toggle + (Task View only) Add Task button. Wrapped in a flex */}
+          {/* so the action sits on the right side of the same row. */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setContentView('features')}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                  contentView === 'features'
+                    ? 'bg-brand text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Feature View
+              </button>
+              <button
+                type="button"
+                onClick={() => setContentView('developers')}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                  contentView === 'developers'
+                    ? 'bg-brand text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Task View
+              </button>
+            </div>
+
+            {contentView === 'developers' && projectId != null && (
+              <button
+                type="button"
+                onClick={() => setShowAddTaskModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
+                           text-white bg-brand hover:bg-brand-dark rounded-lg shadow-sm
+                           transition-colors"
+              >
+                <span aria-hidden="true" className="text-base leading-none">+</span>
+                Add Task
+              </button>
+            )}
           </div>
 
           {contentView === 'features' ? (
