@@ -4,8 +4,6 @@ import com.springboot.MyTodoList.model.TaskTT;
 import com.springboot.MyTodoList.repository.ProjectUserTTRepository;
 import com.springboot.MyTodoList.repository.TaskTTRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -62,23 +60,18 @@ public class TaskTTService {
     /**
      * Returns a single task by its primary key.
      *
-     * @param id  the task_id to look up
-     * @return 200 OK with task body, or 404 NOT FOUND
+     * @param id the task_id to look up
+     * @return Optional containing the task if found
      */
-    public ResponseEntity<TaskTT> getTaskById(long id) {
-        Optional<TaskTT> found = taskTTRepository.findById(id);
-        if (found.isPresent()) {
-            return new ResponseEntity<>(found.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Optional<TaskTT> getTaskById(long id) {
+        return taskTTRepository.findById(id);
     }
 
     /**
      * Returns all tasks assigned to a specific user.
      * Used for the "my tasks" view in the Telegram bot.
      *
-     * @param userId  the user whose tasks to retrieve
+     * @param userId the user whose tasks to retrieve
      */
     public List<TaskTT> getTasksByUser(long userId) {
         return taskTTRepository.findByUserId(userId);
@@ -95,17 +88,34 @@ public class TaskTTService {
     /**
      * Returns all tasks within a specific project (the project backlog).
      *
-     * @param pjId  the project whose backlog to load
+     * @param pjId the project whose backlog to load
      */
     public List<TaskTT> getTasksByProject(long pjId) {
         return taskTTRepository.findByPjId(pjId);
     }
 
     /**
+     * Returns the project board grouped by lifecycle column. Today's date
+     * is read once on the server so all three queries see a consistent
+     * "today" for the split between backlog (future sprint) and active.
+     *
+     * @param pjId  the project to build the board for
+     * @return Map with keys "backlog", "active", "completed"
+     */
+    public java.util.Map<String, List<TaskTT>> getProjectBoard(long pjId) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.util.Map<String, List<TaskTT>> board = new java.util.LinkedHashMap<>();
+        board.put("backlog",   taskTTRepository.findBacklogTasksByProject(pjId, today));
+        board.put("active",    taskTTRepository.findActiveTasksByProject(pjId, today));
+        board.put("completed", taskTTRepository.findCompletedTasksByProject(pjId));
+        return board;
+    }
+
+    /**
      * Returns tasks for a specific user within a specific project.
      *
-     * @param pjId    the project
-     * @param userId  the assignee
+     * @param pjId   the project
+     * @param userId the assignee
      */
     public List<TaskTT> getTasksByProjectAndUser(long pjId, long userId) {
         return taskTTRepository.findByPjIdAndUserId(pjId, userId);
@@ -114,8 +124,8 @@ public class TaskTTService {
     /**
      * Returns tasks filtered by priority within a project.
      *
-     * @param pjId      the project
-     * @param priority  'high', 'medium', or 'low'
+     * @param pjId     the project
+     * @param priority 'high', 'medium', or 'low'
      */
     public List<TaskTT> getTasksByPriority(long pjId, String priority) {
         return taskTTRepository.findByPjIdAndPriority(pjId, priority);
@@ -134,7 +144,7 @@ public class TaskTTService {
     /**
      * Creates a new task in the database.
      *
-     * @param newTask  the TaskTT to insert (taskId should be 0 for new records)
+     * @param newTask the TaskTT to insert (taskId should be 0 for new records)
      * @return the saved entity with the DB-assigned taskId
      */
     public TaskTT addTask(TaskTT newTask) {
@@ -170,7 +180,7 @@ public class TaskTTService {
      * Deletes a task by its primary key.
      * ON DELETE CASCADE on sprint_task_tt removes linked sprint rows too.
      *
-     * @param id  the task_id to delete
+     * @param id the task_id to delete
      * @return true if deleted, false on exception
      */
     public boolean deleteTask(long id) {
@@ -189,36 +199,36 @@ public class TaskTTService {
      *
      * This method is a Java reimplementation of the Oracle stored procedure:
      *
-     *   CREATE OR REPLACE PROCEDURE safe_assign_task (
-     *       p_task_id IN NUMBER,
-     *       p_user_id IN NUMBER
-     *   ) AS
-     *       v_is_member NUMBER;
-     *       v_pj_id NUMBER;
-     *   BEGIN
-     *       -- 1. Find which project the task belongs to
-     *       SELECT pj_id INTO v_pj_id FROM task_tt WHERE task_id = p_task_id;
+     * CREATE OR REPLACE PROCEDURE safe_assign_task (
+     * p_task_id IN NUMBER,
+     * p_user_id IN NUMBER
+     * ) AS
+     * v_is_member NUMBER;
+     * v_pj_id NUMBER;
+     * BEGIN
+     * -- 1. Find which project the task belongs to
+     * SELECT pj_id INTO v_pj_id FROM task_tt WHERE task_id = p_task_id;
      *
-     *       -- 2. Check if user is in that project
-     *       SELECT COUNT(*) INTO v_is_member
-     *       FROM project_user_tt WHERE pj_id = v_pj_id AND user_id = p_user_id;
+     * -- 2. Check if user is in that project
+     * SELECT COUNT(*) INTO v_is_member
+     * FROM project_user_tt WHERE pj_id = v_pj_id AND user_id = p_user_id;
      *
-     *       IF v_is_member > 0 THEN
-     *           UPDATE task_tt SET user_id = p_user_id WHERE task_id = p_task_id;
-     *           COMMIT;
-     *       ELSE
-     *           RAISE_APPLICATION_ERROR(-20001, 'User is not assigned to this project!');
-     *       END IF;
-     *   END;
+     * IF v_is_member > 0 THEN
+     * UPDATE task_tt SET user_id = p_user_id WHERE task_id = p_task_id;
+     * COMMIT;
+     * ELSE
+     * RAISE_APPLICATION_ERROR(-20001, 'User is not assigned to this project!');
+     * END IF;
+     * END;
      *
      * Java equivalent steps:
-     *   1. Load the task — get pjId.
-     *   2. Call existsByIdPjIdAndIdUserId(pjId, userId) on ProjectUserTTRepository.
-     *   3a. If the user IS a member → update task.userId and save.
-     *   3b. If the user is NOT a member → throw IllegalArgumentException.
+     * 1. Load the task — get pjId.
+     * 2. Call existsByIdPjIdAndIdUserId(pjId, userId) on ProjectUserTTRepository.
+     * 3a. If the user IS a member → update task.userId and save.
+     * 3b. If the user is NOT a member → throw IllegalArgumentException.
      *
-     * @param taskId  the ID of the task to reassign
-     * @param userId  the ID of the user to assign to
+     * @param taskId the ID of the task to reassign
+     * @param userId the ID of the user to assign to
      * @return the updated TaskTT entity
      * @throws IllegalArgumentException if the task doesn't exist or the user
      *                                  is not a member of the task's project
@@ -229,27 +239,25 @@ public class TaskTTService {
         Optional<TaskTT> taskOpt = taskTTRepository.findById(taskId);
         if (!taskOpt.isPresent()) {
             throw new IllegalArgumentException(
-                "Task not found with id: " + taskId
-            );
+                    "Task not found with id: " + taskId);
         }
         TaskTT task = taskOpt.get();
         long pjId = task.getPjId();
 
         // Step 2: Check if the target user is a member of the task's project
-        //   Mirrors: SELECT COUNT(*) INTO v_is_member FROM project_user_tt
-        //            WHERE pj_id = v_pj_id AND user_id = p_user_id
+        // Mirrors: SELECT COUNT(*) INTO v_is_member FROM project_user_tt
+        // WHERE pj_id = v_pj_id AND user_id = p_user_id
         boolean isMember = projectUserTTRepository.existsByIdPjIdAndIdUserId(pjId, userId);
 
         if (!isMember) {
             // Step 3b: Mirrors: RAISE_APPLICATION_ERROR(-20001, ...)
             throw new IllegalArgumentException(
-                "User " + userId + " is not a member of project " + pjId +
-                ". Cannot assign task " + taskId + "."
-            );
+                    "User " + userId + " is not a member of project " + pjId +
+                            ". Cannot assign task " + taskId + ".");
         }
 
         // Step 3a: User is a valid member — perform the reassignment
-        //   Mirrors: UPDATE task_tt SET user_id = p_user_id WHERE task_id = p_task_id
+        // Mirrors: UPDATE task_tt SET user_id = p_user_id WHERE task_id = p_task_id
         task.setUserId(userId);
         return taskTTRepository.save(task);
     }
