@@ -13,17 +13,26 @@ import org.springframework.web.bind.annotation.RestController;
 import com.springboot.MyTodoList.service.KpisService;
 
 /*
+ *  KPI endpoints — all responses are Map<String,Object> rows so the SQL
+ *  column aliases drive the field names (see KpisRepository for the queries).
+ *
  *  Nivel proyecto (todos los sprints):
- *    GET /projects/{pjId}/kpis/velocity
- *    GET /projects/{pjId}/kpis/retrabajo
- *    GET /projects/{pjId}/kpis/carga-equipo
- *    GET /projects/{pjId}/kpis/completitud
+ *    GET /api/projects/{pjId}/kpis/project-velocity  — single aggregate row
+ *    GET /api/projects/{pjId}/kpis/velocity          — one row per sprint
+ *    GET /api/projects/{pjId}/kpis/retrabajo         — carry-over rate per sprint
+ *    GET /api/projects/{pjId}/kpis/carga-equipo      — workload per team member
+ *    GET /api/projects/{pjId}/kpis/completitud       — weighted completion per sprint
  *
  *  Nivel sprint (un sprint específico):
- *    GET /projects/{pjId}/sprints/{sprId}/kpis/velocity
- *    GET /projects/{pjId}/sprints/{sprId}/kpis/retrabajo
- *    GET /projects/{pjId}/sprints/{sprId}/kpis/carga-equipo
- *    GET /projects/{pjId}/sprints/{sprId}/kpis/completitud
+ *    GET /api/projects/{pjId}/sprints/{sprId}/kpis/velocity
+ *    GET /api/projects/{pjId}/sprints/{sprId}/kpis/retrabajo
+ *    GET /api/projects/{pjId}/sprints/{sprId}/kpis/carga-equipo
+ *    GET /api/projects/{pjId}/sprints/{sprId}/kpis/completitud
+ *
+ *  Nivel feature:
+ *    GET /api/features/{featureId}/kpis/completitud
+ *    GET /api/features/{featureId}/kpis/velocity
+ *    GET /api/features/{featureId}/kpis/carga-equipo
  */
 @RestController
 @RequestMapping("/api")
@@ -34,11 +43,22 @@ public class KpisController {
 
     // ─── Nivel proyecto ───────────────────────────────────────────────────────
 
+    /**
+     * Returns a single aggregate velocity row for the entire project:
+     * {@code { finished_sprints, avg_velocity }}.
+     * This is a scalar summary used by the KPI cards; it differs from
+     * {@link #getVelocityByProject} which returns one row per sprint.
+     */
     @GetMapping("/projects/{pjId}/kpis/project-velocity")
     public ResponseEntity<Map<String, Object>> getProjectVelocityMetric(@PathVariable long pjId) {
         return ResponseEntity.ok(kpisService.getProjectVelocityMetric(pjId));
     }
 
+    /**
+     * Returns one velocity row per sprint for chart rendering.
+     * Use {@link #getProjectVelocityMetric} instead when only the project-wide
+     * average is needed.
+     */
     @GetMapping("/projects/{pjId}/kpis/velocity")
     public ResponseEntity<List<Map<String, Object>>> getVelocityByProject(@PathVariable long pjId) {
         return ResponseEntity.ok(kpisService.getVelocityByProject(pjId));

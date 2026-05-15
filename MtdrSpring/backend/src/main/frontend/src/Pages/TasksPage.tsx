@@ -1,10 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { Button, TableBody, CircularProgress } from '@mui/material';
 import Moment from 'react-moment';
 import { FunnelIcon, CheckCircleIcon, ArrowUturnLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid';
 import palette from '../theme';
 import { saveToStorage, getFromStorage, STORAGE_KEYS } from '../Utils/storage';
+
+/** Shape of GET /api/projects/{pjId}/board — used only in board mode. */
+type BoardData = {
+  backlog: TaskDTO[];
+  active: TaskDTO[];
+  completed: TaskDTO[];
+};
+const EMPTY_BOARD: BoardData = { backlog: [], active: [], completed: [] };
+const BOARD_COLUMNS: { key: keyof BoardData; label: string; accent: string }[] = [
+  { key: 'backlog',   label: 'Backlog',   accent: '#6b7280' },
+  { key: 'active',    label: 'Active',    accent: '#2563eb' },
+  { key: 'completed', label: 'Completed', accent: '#16a34a' },
+];
 
 type Priority = 'high' | 'medium' | 'low';
 type SortOption =
@@ -204,6 +218,61 @@ export default function TasksPage() {
   const [newPriority, setNewPriority] = useState<Priority>('medium');
   const [newStoryPoints, setNewStoryPoints] = useState<string>('');
 
+  // ─── Board mode ────────────────────────────────────────────────────────
+  // When the route is /projects/:projectId/board, this same component
+  // renders the project Backlog/Active/Completed board instead of the
+  // global task list. Detected purely by URL param presence.
+  const { projectId: projectIdParam } = useParams<{ projectId?: string }>();
+  const isBoardMode = projectIdParam != null;
+  const boardProjectId = isBoardMode ? Number(projectIdParam) : null;
+  const boardCacheKey = boardProjectId != null
+    ? `${STORAGE_KEYS.PROJECT_BOARD}_${boardProjectId}`
+    : null;
+
+  const [board, setBoard] = useState<BoardData>(() => {
+    if (!boardCacheKey) return EMPTY_BOARD;
+    return getFromStorage<BoardData>(boardCacheKey) ?? EMPTY_BOARD;
+  });
+  const [boardLoading, setBoardLoading] = useState(false);
+
+  // Currently-open task detail modal. Null = no modal. Also carries which
+  // column the card came from so the modal header can show that state.
+  const [selectedTask, setSelectedTask] = useState<{
+    task: TaskDTO;
+    column: keyof BoardData;
+  } | null>(null);
+
+  // Close modal on Escape — keyboard accessibility nicety.
+  useEffect(() => {
+    if (!selectedTask) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedTask(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedTask]);
+
+  useEffect(() => {
+    if (!isBoardMode || boardProjectId == null) return;
+    let cancelled = false;
+    setBoardLoading(true);
+    fetch(`/api/projects/${boardProjectId}/board`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: BoardData | null) => {
+        if (cancelled || !data) return;
+        const normalized: BoardData = {
+          backlog:   data.backlog   ?? [],
+          active:    data.active    ?? [],
+          completed: data.completed ?? [],
+        };
+        setBoard(normalized);
+        if (boardCacheKey) saveToStorage(boardCacheKey, normalized);
+      })
+      .catch(() => { /* keep cached board on failure */ })
+      .finally(() => { if (!cancelled) setBoardLoading(false); });
+    return () => { cancelled = true; };
+  }, [isBoardMode, boardProjectId, boardCacheKey]);
+
   function sortTasks(list: TaskDTO[]): TaskDTO[] {
     if (sortBy === 'none') return list;
     const copy = [...list];
@@ -331,6 +400,358 @@ export default function TasksPage() {
     } finally {
       setInserting(false);
     }
+  }
+
+  // ─── Board mode render — early return ─────────────────────────────────
+  // Replaces the entire list/CRUD UI below with a 3-column board grouped
+  // by lifecycle state. Each column scrolls independently so adding many
+  // tasks to one column doesn't push the page vertically.
+  if (isBoardMode) {
+    return (
+      <div style={{
+        // Fill the parent <main> (which already handles overflow:auto).
+        // height:100% lets the inner columns lock to a viewport-relative
+        // size and scroll on their own.
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '24px',
+        boxSizing: 'border-box',
+        background: '#f3f4f6',
+      }}>
+        {/* Page header — stays fixed above the column grid. */}
+        <div style={{ marginBottom: '20px' }}>
+          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#111827' }}>
+            Project Backlog
+          </h1>
+          <p style={{ color: '#6b7280', margin: '4px 0 0 0', fontSize: '14px' }}>
+            {boardLoading ? 'Loading…' : 'Tasks grouped by lifecycle state.'}
+          </p>
+        </div>
+
+        {/* Column grid — flex:1 + minHeight:0 is the trick that lets */}
+        {/* children with overflow:auto actually scroll inside flexbox. */}
+        <div style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(280px, 1fr))',
+          gap: '16px',
+        }}>
+          {BOARD_COLUMNS.map(({ key, label, accent }) => {
+            const items = board[key];
+            return (
+              <div key={key} style={{
+                display: 'flex',
+                flexDirection: 'column',
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '14px',
+                overflow: 'hidden',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              }}>
+                {/* Column header — sticky inside its own column, accent bar */}
+                {/* on the left for quick visual grouping. */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  padding: '14px 16px',
+                  borderBottom: '1px solid #e5e7eb',
+                  background: '#f9fafb',
+                  borderLeft: `4px solid ${accent}`,
+                }}>
+                  <h2 style={{
+                    margin: 0,
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    color: '#374151',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}>{label}</h2>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    background: accent,
+                    borderRadius: '9999px',
+                    padding: '2px 10px',
+                    minWidth: '24px',
+                    textAlign: 'center',
+                  }}>{items.length}</span>
+                </div>
+
+                {/* Scrollable card list — overflow lives here so each */}
+                {/* column scrolls independently of the page. */}
+                <div style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  padding: '12px',
+                }}>
+                  {items.length === 0 ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      minHeight: '120px',
+                      color: '#9ca3af',
+                      fontSize: '13px',
+                      fontStyle: 'italic',
+                    }}>
+                      No tasks
+                    </div>
+                  ) : (
+                    items.map(t => (
+                      <div key={t.taskId}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedTask({ task: t, column: key })}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedTask({ task: t, column: key });
+                          }
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #e5e7eb',
+                          borderLeft: `3px solid ${accent}`,
+                          borderRadius: '10px',
+                          padding: '12px 14px',
+                          marginBottom: '10px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                          transition: 'transform 0.12s ease, box-shadow 0.12s ease',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.08)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+                        }}
+                      >
+                        <div style={{
+                          fontWeight: 600,
+                          color: '#111827',
+                          fontSize: '14px',
+                          marginBottom: '8px',
+                          lineHeight: 1.35,
+                        }}>
+                          {t.nameTask}
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <PriorityBadge priority={t.priority} />
+                          <StoryPointsBadge points={t.storyPoints} />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ─── Task detail modal ─────────────────────────────────────── */}
+        {selectedTask && (() => {
+          const { task, column } = selectedTask;
+          const accent =
+            BOARD_COLUMNS.find(c => c.key === column)?.accent ?? '#6b7280';
+          const columnLabel =
+            BOARD_COLUMNS.find(c => c.key === column)?.label ?? column;
+          // Lookup assignee name from the users list TasksPage already loads
+          // on mount — falls back to the raw id if the user isn't cached yet.
+          const assignee = users.find(u => u.userId === task.userId);
+          const assigneeName = assignee ? assignee.nameUser : `User #${task.userId}`;
+          const fmtDate = (iso?: string | null) =>
+            iso ? new Date(iso).toLocaleDateString() : '—';
+
+          return (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="task-modal-title"
+              onClick={() => setSelectedTask(null)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.55)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px',
+                zIndex: 50,
+              }}
+            >
+              {/* Stop click-through so clicking inside the card doesn't dismiss */}
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  width: '100%',
+                  maxWidth: '560px',
+                  maxHeight: '90vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  background: '#ffffff',
+                  borderRadius: '16px',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Accent strip header — same color as the column of origin */}
+                <div style={{
+                  padding: '18px 24px',
+                  borderBottom: '1px solid #e5e7eb',
+                  borderTop: `4px solid ${accent}`,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: accent,
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                    }}>
+                      {columnLabel}
+                    </div>
+                    <h2 id="task-modal-title" style={{
+                      margin: 0,
+                      fontSize: '20px',
+                      fontWeight: 700,
+                      color: '#111827',
+                      lineHeight: 1.3,
+                      wordBreak: 'break-word',
+                    }}>
+                      {task.nameTask || 'Untitled task'}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTask(null)}
+                    aria-label="Close"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: '24px',
+                      lineHeight: 1,
+                      cursor: 'pointer',
+                      color: '#6b7280',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Scrollable body so long descriptions don't blow up the modal */}
+                <div style={{
+                  padding: '20px 24px',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '18px',
+                }}>
+                  {/* Badges row */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <PriorityBadge priority={task.priority} />
+                    <StoryPointsBadge points={task.storyPoints} />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      marginBottom: '6px',
+                    }}>Description</div>
+                    <p style={{
+                      margin: 0,
+                      color: task.infoTask ? '#111827' : '#9ca3af',
+                      fontSize: '14px',
+                      lineHeight: 1.55,
+                      fontStyle: task.infoTask ? 'normal' : 'italic',
+                      whiteSpace: 'pre-wrap',
+                    }}>
+                      {task.infoTask || 'No description provided.'}
+                    </p>
+                  </div>
+
+                  {/* Meta grid — dates + assignee */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '12px 20px',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Assignee</div>
+                      <div style={{ fontSize: '14px', color: '#111827', marginTop: '2px' }}>{assigneeName}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Task ID</div>
+                      <div style={{ fontSize: '14px', color: '#111827', marginTop: '2px' }}>#{task.taskId}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Started</div>
+                      <div style={{ fontSize: '14px', color: '#111827', marginTop: '2px' }}>{fmtDate(task.dateStartTask)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Due</div>
+                      <div style={{ fontSize: '14px', color: '#111827', marginTop: '2px' }}>{fmtDate(task.dateEndSetTask)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Completed</div>
+                      <div style={{ fontSize: '14px', color: '#111827', marginTop: '2px' }}>{fmtDate(task.dateEndRealTask)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer with close action */}
+                <div style={{
+                  padding: '14px 24px',
+                  borderTop: '1px solid #e5e7eb',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  background: '#f9fafb',
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTask(null)}
+                    style={{
+                      padding: '8px 18px',
+                      border: '1px solid #d1d5db',
+                      background: '#ffffff',
+                      color: '#374151',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    );
   }
 
   return (

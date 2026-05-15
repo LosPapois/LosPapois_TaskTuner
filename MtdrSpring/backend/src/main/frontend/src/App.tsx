@@ -13,9 +13,7 @@ import ProjectsPage from './Pages/ProjectsPage';
 import { Sidebar, SidebarToggle } from './Components/Sidebar';
 import PageBreadcrumb from './Components/Header/PageBreadcrumb';
 import HomeButton from './Components/Header/HomeButton';
-// Old top-bar Navigation kept importable in case we need to revert quickly,
-// but it is no longer rendered — Sidebar replaces it.
-// import Navigation from './Components/Navigation';
+
 import {
   getFromStorage,
   saveToStorage,
@@ -54,6 +52,9 @@ function App() {
       {/* which keeps NavLink's active highlight per-group correct. */}
       <Route path="/projects/:projectId/team" element={<TeamPage />} />
       <Route path="/projects/:projectId/statistics" element={<StatisticsPage />} />
+      {/* Project board (Backlog / Active / Completed) — reuses TasksPage in */}
+      {/* board mode, triggered when the route carries a projectId param. */}
+      <Route path="/projects/:projectId/board" element={<TasksPage />} />
       <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
