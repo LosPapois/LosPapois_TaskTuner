@@ -8,6 +8,10 @@ export interface ProjectDTO {
   namePj: string;
   dateEndSetPj?: string | null;
   dateEndRealPj?: string | null;
+  /** Project setting — when false, the user closes sprints manually via the */
+  /** "Terminar Sprint" button on SprintPage. */
+  autoCloseSprints?: boolean;
+  autoRollover?: boolean;
 }
 
 export interface SprintDTO {

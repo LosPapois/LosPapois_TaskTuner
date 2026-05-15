@@ -8,6 +8,7 @@ import {
   EllipsisVerticalIcon,
   FolderIcon,
   PlusIcon,
+  Squares2X2Icon,
   TrashIcon,
   UserGroupIcon,
   XCircleIcon,
@@ -361,6 +362,8 @@ function SidebarProjectGroup({
         <div className="ml-4 mt-1 mb-1 border-l border-gray-100 pl-2 space-y-0.5">
           <SidebarItem icon={UserGroupIcon} label="Team" to={`/projects/${projectId}/team`} dense />
           <SidebarItem icon={ChartBarIcon} label="Statistics" to={`/projects/${projectId}/statistics`} dense />
+          <SidebarItem icon={Squares2X2Icon} label="Backlog" to={`/projects/${projectId}/board`} dense />
+
           <SidebarSectionLabel>Sprints</SidebarSectionLabel>
 
           {sprints.length === 0 ? (
