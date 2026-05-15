@@ -57,12 +57,10 @@ public class UserController {
     //@CrossOrigin
     @DeleteMapping(value = "deleteUser/{id}")
     public ResponseEntity<Boolean> deleteUser(@PathVariable("id") int id){
-        Boolean flag = false;
-        try{
-            flag = userService.deleteUser(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        }catch (Exception e){
-            return new ResponseEntity<>(flag,HttpStatus.NOT_FOUND);
+        try {
+            return ResponseEntity.ok(userService.deleteUser(id));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
         }
     }
 

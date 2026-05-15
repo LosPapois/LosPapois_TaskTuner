@@ -77,12 +77,10 @@ public class SprintTaskTTController {
 
     @DeleteMapping(value = "/sprint-tasks/{sprId}/{taskId}")
     public ResponseEntity<Boolean> removeTaskFromSprint(@PathVariable long sprId, @PathVariable long taskId) {
-        Boolean flag = false;
         try {
-            flag = sprintTaskTTService.removeTaskFromSprint(sprId, taskId);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            return ResponseEntity.ok(sprintTaskTTService.removeTaskFromSprint(sprId, taskId));
         } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+            return ResponseEntity.notFound().build();
         }
     }
 }

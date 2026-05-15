@@ -91,12 +91,10 @@ public class ProjectTTController {
 
     @DeleteMapping(value = "/projects/{id}")
     public ResponseEntity<Boolean> deleteProject(@PathVariable long id) {
-        Boolean flag = false;
         try {
-            flag = projectTTService.deleteProject(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            return ResponseEntity.ok(projectTTService.deleteProject(id));
         } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+            return ResponseEntity.notFound().build();
         }
     }
 }

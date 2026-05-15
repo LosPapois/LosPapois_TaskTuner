@@ -179,7 +179,7 @@ public class GroqService {
     public String ask(String systemPrompt, String userQuestion) throws IOException {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", MODEL);
-        body.put("max_tokens", 400);
+        body.put("max_tokens", 700);
         body.put("temperature", 0.3);
 
         List<Map<String, String>> messages = new ArrayList<>();

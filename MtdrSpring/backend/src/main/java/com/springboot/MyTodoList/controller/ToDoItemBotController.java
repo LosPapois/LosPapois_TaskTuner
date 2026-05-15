@@ -19,9 +19,11 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 import com.springboot.MyTodoList.config.BotProps;
-import com.springboot.MyTodoList.service.DeepSeekService;
+import com.springboot.MyTodoList.service.DocumentProcessingService;
+import com.springboot.MyTodoList.service.DocumentTTService;
 import com.springboot.MyTodoList.service.GroqService;
 import com.springboot.MyTodoList.service.FeatureTTService;
+import com.springboot.MyTodoList.service.LuceneService;
 import com.springboot.MyTodoList.service.ProjectTTService;
 import com.springboot.MyTodoList.service.ProjectUserTTService;
 import com.springboot.MyTodoList.service.SprintTaskTTService;
@@ -41,7 +43,6 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
     //   - Messages from different chats run in parallel (no blocking between users)
     private final ConcurrentHashMap<Long, ExecutorService> chatExecutors = new ConcurrentHashMap<>();
     private final ToDoItemService toDoItemService;
-    private final DeepSeekService deepSeekService;
     private final GroqService groqService;
     private final UserTTService userTTService;
     private final SprintTTService sprintTTService;
@@ -50,6 +51,9 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
     private final SprintTaskTTService sprintTaskTTService;
     private final TaskTTService taskTTService;
     private final FeatureTTService featureTTService;
+    private final LuceneService luceneService;
+    private final DocumentProcessingService documentProcessingService;
+    private final DocumentTTService documentTTService;
     private final TelegramClient telegramClient;
     private final BotProps botProps;
 
@@ -60,7 +64,6 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
 
     public ToDoItemBotController(BotProps bp,
             ToDoItemService tsvc,
-            @Autowired(required = false) DeepSeekService ds,
             @Autowired(required = false) GroqService gs,
             UserTTService userTTService,
             SprintTTService sprintTTService,
@@ -69,11 +72,13 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
             SprintTaskTTService sprintTaskTTService,
             TaskTTService taskTTService,
             FeatureTTService featureTTService,
+            LuceneService luceneService,
+            DocumentProcessingService documentProcessingService,
+            DocumentTTService documentTTService,
             TelegramClient telegramClient) {
         this.botProps = bp;
         this.telegramClient = telegramClient;
         this.toDoItemService = tsvc;
-        this.deepSeekService = ds;
         this.groqService = gs;
         this.userTTService = userTTService;
         this.sprintTTService = sprintTTService;
@@ -82,6 +87,9 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
         this.sprintTaskTTService = sprintTaskTTService;
         this.taskTTService = taskTTService;
         this.featureTTService = featureTTService;
+        this.luceneService = luceneService;
+        this.documentProcessingService = documentProcessingService;
+        this.documentTTService = documentTTService;
     }
 
     @Override
@@ -105,6 +113,8 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
         long chatId;
         if (update.hasMessage() && update.getMessage().hasText()) {
             chatId = update.getMessage().getChatId();
+        } else if (update.hasMessage() && update.getMessage().hasDocument()) {
+            chatId = update.getMessage().getChatId();
         } else if (update.hasCallbackQuery()) {
             chatId = update.getCallbackQuery().getMessage().getChatId();
         } else {
@@ -126,9 +136,23 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
         String messageFromTelegram;
         long chatId;
         String username;
+        String docFileId   = null;
+        String docFileName = null;
+        String docMimeType = null;
 
         if (update.hasMessage() && update.getMessage().hasText()) {
             messageFromTelegram = update.getMessage().getText();
+            chatId = update.getMessage().getChatId();
+            username = update.getMessage().getFrom() != null
+                    ? update.getMessage().getFrom().getUserName()
+                    : null;
+        } else if (update.hasMessage() && update.getMessage().hasDocument()) {
+            // Document message: use sentinel command so BotActions can handle it
+            var doc = update.getMessage().getDocument();
+            docFileId   = doc.getFileId();
+            docFileName = doc.getFileName() != null ? doc.getFileName() : "document";
+            docMimeType = doc.getMimeType();
+            messageFromTelegram = "/uploaddoc";
             chatId = update.getMessage().getChatId();
             username = update.getMessage().getFrom() != null
                     ? update.getMessage().getFrom().getUserName()
@@ -154,13 +178,17 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
         String telegramIdentity = (username != null && !username.trim().isEmpty())
                 ? "@" + username : String.valueOf(chatId);
 
-        BotActions actions = new BotActions(telegramClient, toDoItemService, deepSeekService,
+        BotActions actions = new BotActions(telegramClient, toDoItemService,
                 groqService,
                 userTTService, sprintTTService, projectTTService, projectUserTTService,
-                sprintTaskTTService, taskTTService, featureTTService);
+                sprintTaskTTService, taskTTService, featureTTService,
+                luceneService, documentProcessingService, documentTTService);
         actions.setRequestText(messageFromTelegram);
         actions.setChatId(chatId);
         actions.setTelegramIdentity(telegramIdentity);
+        if (docFileId != null) {
+            actions.setDocumentInfo(docFileId, docFileName, docMimeType);
+        }
         if (actions.getTodoService() == null) {
             logger.info("todosvc error");
             actions.setTodoService(toDoItemService);
@@ -189,7 +217,8 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
         actions.fnAiCreate();
         actions.fnAsk();
         actions.fnImportTasks();
-        actions.fnLLM();
+        actions.fnUploadDocument();
+        actions.fnListDocs();
         actions.fnElse();
     }
 

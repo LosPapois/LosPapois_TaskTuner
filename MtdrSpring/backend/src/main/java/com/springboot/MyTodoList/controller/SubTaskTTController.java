@@ -84,12 +84,10 @@ public class SubTaskTTController {
 
     @DeleteMapping(value = "/subtasks/{id}")
     public ResponseEntity<Boolean> deleteSubTask(@PathVariable("id") long id) {
-        Boolean flag = false;
         try {
-            flag = subTaskTTService.deleteSubTask(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            return ResponseEntity.ok(subTaskTTService.deleteSubTask(id));
         } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+            return ResponseEntity.notFound().build();
         }
     }
 }

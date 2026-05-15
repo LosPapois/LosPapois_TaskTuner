@@ -27,9 +27,11 @@ import com.springboot.MyTodoList.model.SprintTT;
 import com.springboot.MyTodoList.model.TaskTT;
 import com.springboot.MyTodoList.model.ToDoItem;
 import com.springboot.MyTodoList.model.UserTT;
-import com.springboot.MyTodoList.service.DeepSeekService;
+import com.springboot.MyTodoList.service.DocumentProcessingService;
+import com.springboot.MyTodoList.service.DocumentTTService;
 import com.springboot.MyTodoList.service.GroqService;
 import com.springboot.MyTodoList.service.FeatureTTService;
+import com.springboot.MyTodoList.service.LuceneService;
 import com.springboot.MyTodoList.service.ProjectTTService;
 import com.springboot.MyTodoList.service.ProjectUserTTService;
 import com.springboot.MyTodoList.service.SprintTTService;
@@ -57,8 +59,12 @@ public class BotActions {
     TelegramClient telegramClient;
     boolean exit;
 
+    // RAG: document fields set when update contains a file (not text)
+    String documentFileId;
+    String documentFileName;
+    String documentMimeType;
+
     ToDoItemService todoService;
-    DeepSeekService deepSeekService;
     GroqService groqService;
     UserTTService userTTService;
     SprintTTService sprintTTService;
@@ -67,18 +73,22 @@ public class BotActions {
     SprintTaskTTService sprintTaskTTService;
     TaskTTService taskTTService;
     FeatureTTService featureTTService;
+    LuceneService luceneService;
+    DocumentProcessingService documentProcessingService;
+    DocumentTTService documentTTService;
 
     private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
-    public BotActions(TelegramClient tc, ToDoItemService ts, DeepSeekService ds,
+    public BotActions(TelegramClient tc, ToDoItemService ts,
                       GroqService gs,
                       UserTTService uts, SprintTTService stts,
                       ProjectTTService ptts, ProjectUserTTService puts,
                       SprintTaskTTService sttts,
-                      TaskTTService ttts, FeatureTTService ftts) {
+                      TaskTTService ttts, FeatureTTService ftts,
+                      LuceneService ls, DocumentProcessingService dps,
+                      DocumentTTService dts) {
         telegramClient = tc;
         todoService = ts;
-        deepSeekService = ds;
         groqService = gs;
         userTTService = uts;
         sprintTTService = stts;
@@ -87,7 +97,16 @@ public class BotActions {
         sprintTaskTTService = sttts;
         taskTTService = ttts;
         featureTTService = ftts;
+        luceneService = ls;
+        documentProcessingService = dps;
+        documentTTService = dts;
         exit = false;
+    }
+
+    public void setDocumentInfo(String fileId, String fileName, String mimeType) {
+        this.documentFileId   = fileId;
+        this.documentFileName = fileName;
+        this.documentMimeType = mimeType;
     }
 
     public void setRequestText(String cmd) { requestText = cmd; }
@@ -96,8 +115,6 @@ public class BotActions {
     public void setTelegramClient(TelegramClient tc) { telegramClient = tc; }
     public void setTodoService(ToDoItemService tsvc) { todoService = tsvc; }
     public ToDoItemService getTodoService() { return todoService; }
-    public void setDeepSeekService(DeepSeekService dssvc) { deepSeekService = dssvc; }
-    public DeepSeekService getDeepSeekService() { return deepSeekService; }
     public void setGroqService(GroqService gs) { groqService = gs; }
     public GroqService getGroqService() { return groqService; }
     public UserTTService getUserTTService() { return userTTService; }
@@ -146,21 +163,38 @@ public class BotActions {
         }
     }
 
-    private boolean isOutOfRange(String text) {
+    private String dateErrorMessage(String text) {
         try {
             int year = LocalDate.parse(text.trim(), DATE_FMT).getYear();
-            return year < DATE_YEAR_MIN || year > DATE_YEAR_MAX;
-        } catch (DateTimeParseException e) {
-            return false;
-        }
+            if (year < DATE_YEAR_MIN || year > DATE_YEAR_MAX)
+                return BotMessages.INVALID_DATE_RANGE.getMessage();
+        } catch (DateTimeParseException ignored) {}
+        return BotMessages.INVALID_DATE.getMessage();
     }
 
-    private boolean isUserAuthenticated(){
-        return authenticatedUsers.containsKey(chatId);
+    private boolean isUserAuthenticated() {
+        if (authenticatedUsers.containsKey(chatId)) return true;
+        // Auto-restore session from DB on restart or when a different instance had the session.
+        // Telegram already authenticates the sender — if they're registered, treat as logged in.
+        if (userTTService != null && telegramIdentity != null) {
+            Optional<UserTT> user = userTTService.getUserByTelegram(telegramIdentity);
+            if (user.isPresent()) {
+                authenticatedUsers.put(chatId, user.get());
+                return true;
+            }
+        }
+        return false;
     }
 
     private UserTT getAuthenticatedUser() {
         return authenticatedUsers.get(chatId);
+    }
+
+    private boolean requireAuth() {
+        if (isUserAuthenticated()) return true;
+        BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
+        exit = true;
+        return false;
     }
 
     // ─── Bot actions ─────────────────────────────────────────────────────
@@ -292,12 +326,7 @@ public class BotActions {
     }
 
     public void fnUndo() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (exit || !requireAuth()) return;
 
         String cmd = requestText.trim();
         if (!cmd.equals(BotCommands.MARK_UNDO.getCommand())
@@ -337,12 +366,7 @@ public class BotActions {
     public void fnMarkTaskUndo() {
         if (exit) return;
         if (!requestText.startsWith("UNDO_TASK:")) return;
-
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first.", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (!requireAuth()) return;
 
         long taskId;
         try {
@@ -482,6 +506,7 @@ public class BotActions {
             case WAITING_IMPORT_SPRINT:             handleImportSprint();            break;
             case WAITING_IMPORT_FEATURE:            handleImportFeature();           break;
             case WAITING_IMPORT_CONFIRM:            handleImportConfirm();           break;
+            case WAITING_DOC_FILE:                  fnUploadDocument();              break;
             default: break;
         }
     }
@@ -603,10 +628,7 @@ public class BotActions {
     private void handleNewItemDateStart() {
         LocalDate date = parseDate(requestText);
         if (date == null) {
-            String errorMsg = isOutOfRange(requestText)
-                ? BotMessages.INVALID_DATE_RANGE.getMessage()
-                : BotMessages.INVALID_DATE.getMessage();
-            BotHelper.sendMessageToTelegram(chatId, errorMsg, telegramClient, null);
+            BotHelper.sendMessageToTelegram(chatId, dateErrorMessage(requestText), telegramClient, null);
             exit = true;
             return;
         }
@@ -620,10 +642,7 @@ public class BotActions {
     private void handleNewItemDateEnd() {
         LocalDate date = parseDate(requestText);
         if (date == null) {
-            String errorMsg = isOutOfRange(requestText)
-                ? BotMessages.INVALID_DATE_RANGE.getMessage()
-                : BotMessages.INVALID_DATE.getMessage();
-            BotHelper.sendMessageToTelegram(chatId, errorMsg, telegramClient, null);
+            BotHelper.sendMessageToTelegram(chatId, dateErrorMessage(requestText), telegramClient, null);
             exit = true;
             return;
         }
@@ -734,23 +753,9 @@ public class BotActions {
             ? sprintTTService.getSprintsByProject(pjId)
             : sprintTTService.findAll();
 
-        List<SprintTT> available = source.stream()
+        return source.stream()
             .filter(s -> !"done".equals(s.getStateSprint()))
             .collect(Collectors.toList());
-
-        // Seed only when user has no project AND there are truly no sprints in the DB at all.
-        // If all sprints are 'done' (e.g. project just closed), do NOT seed — the developer
-        // simply has no active project and should see an empty list.
-        if (available.isEmpty() && pjId == 0) {
-            boolean anySprintsInDb = !sprintTTService.findAll().isEmpty();
-            if (!anySprintsInDb) {
-                seedSprints();
-                available = sprintTTService.findAll().stream()
-                    .filter(s -> !"done".equals(s.getStateSprint()))
-                    .collect(Collectors.toList());
-            }
-        }
-        return available;
     }
 
     /**
@@ -761,50 +766,6 @@ public class BotActions {
         boolean started = sprint.getDateStartSpr() != null
             && !sprint.getDateStartSpr().isAfter(LocalDate.now());
         return ("active".equals(sprint.getStateSprint()) && started) ? " ✅" : " 🕐";
-    }
-
-    private void seedSprints() {
-        logger.info("No active sprints found — seeding test data...");
-        List<ProjectTT> projects = projectTTService.findAll();
-        long pjId;
-        if (projects.isEmpty()) {
-            ProjectTT seed = new ProjectTT();
-            seed.setNamePj("Demo Project");
-            seed.setDateStartPj(LocalDate.now());
-            seed.setDateEndSetPj(LocalDate.now().plusMonths(3));
-            pjId = projectTTService.addProject(seed).getPjId();
-        } else {
-            pjId = projects.get(0).getPjId();
-        }
-
-        SprintTT s1 = new SprintTT();
-        s1.setNameSprint("Sprint 1: Setup");
-        s1.setDateStartSpr(LocalDate.now());
-        s1.setDateEndSpr(LocalDate.now().plusWeeks(2));
-        s1.setTaskGoal(20);
-        s1.setStateSprint("active");
-        s1.setPjId(pjId);
-        sprintTTService.addSprint(s1);
-
-        SprintTT s2 = new SprintTT();
-        s2.setNameSprint("Sprint 2: Features");
-        s2.setDateStartSpr(LocalDate.now().plusWeeks(2));
-        s2.setDateEndSpr(LocalDate.now().plusWeeks(4));
-        s2.setTaskGoal(25);
-        s2.setStateSprint("inactive");  // future sprint — activated by process_sprint_transitions
-        s2.setPjId(pjId);
-        sprintTTService.addSprint(s2);
-
-        SprintTT s3 = new SprintTT();
-        s3.setNameSprint("Sprint 3: Testing");
-        s3.setDateStartSpr(LocalDate.now().plusWeeks(4));
-        s3.setDateEndSpr(LocalDate.now().plusWeeks(6));
-        s3.setTaskGoal(15);
-        s3.setStateSprint("inactive");  // future sprint — activated by process_sprint_transitions
-        s3.setPjId(pjId);
-        sprintTTService.addSprint(s3);
-
-        logger.info("Seeded 3 sprints for pjId={}", pjId);
     }
 
     private void handleNewItemSprint() {
@@ -935,12 +896,7 @@ public class BotActions {
     // ─── Feature creation handlers ───────────────────────────────────────
 
     public void fnAddFeature() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (exit || !requireAuth()) return;
 
         if (!requestText.contains(BotCommands.ADD_FEATURE.getCommand())) return;
 
@@ -1096,12 +1052,7 @@ public class BotActions {
     // ─── Other actions ───────────────────────────────────────────────────
 
     public void fnListAll() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (exit || !requireAuth()) return;
 
         if (!(requestText.equals(BotCommands.TODO_LIST.getCommand())
                 || requestText.equals(BotLabels.LIST_ALL_ITEMS.getLabel())
@@ -1193,12 +1144,7 @@ public class BotActions {
     // ─── Task edit flow ──────────────────────────────────────────────────
 
     public void fnShowEditPicker() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first.", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (exit || !requireAuth()) return;
         if (!requestText.trim().equals(BotCommands.EDIT_TASK.getCommand())) return;
 
         UserTT user = getAuthenticatedUser();
@@ -1235,11 +1181,7 @@ public class BotActions {
     public void fnEditPickTask() {
         if (exit) return;
         if (!requestText.startsWith("EDIT_PICK:")) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first.", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (!requireAuth()) return;
 
         long taskId;
         try {
@@ -1498,12 +1440,7 @@ public class BotActions {
     // ─── Feature edit flow ───────────────────────────────────────────────
 
     public void fnShowEditFeaturePicker() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first.", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (exit || !requireAuth()) return;
         if (!requestText.trim().equals(BotCommands.EDIT_FEATURE.getCommand())) return;
 
         long pjId = getUserProjectId();
@@ -1543,11 +1480,7 @@ public class BotActions {
     public void fnEditPickFeature() {
         if (exit) return;
         if (!requestText.startsWith("EDIT_FEAT_PICK:")) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first.", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (!requireAuth()) return;
 
         long featureId;
         try {
@@ -1780,12 +1713,7 @@ public class BotActions {
     }
 
     public void fnAddItem() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (exit || !requireAuth()) return;
 
         logger.info("Adding item");
         if (!(requestText.contains(BotCommands.ADD_ITEM.getCommand())
@@ -1995,17 +1923,35 @@ public class BotActions {
         + "SUGGESTION (user asks what to work on next, which task to pick, what to tackle, recommend a task):\n"
         + "  Has tasks: {\"type\":\"suggest\",\"taskName\":\"<exact name from pending tasks>\","
         +              "\"priority\":\"<priority>\",\"storyPoints\":<int>,\"dueDate\":\"<due date>\","
-        +              "\"reason\":\"<why this task first, max 20 words, in user's language>\"}\n"
+        +              "\"complexity\":\"high|medium|low\","
+        +              "\"reason\":\"<why this task, mentioning priority and complexity, max 25 words, in user's language>\"}\n"
         + "  No tasks:  {\"type\":\"suggest\",\"taskName\":null,\"reason\":\"<message in user's language>\"}\n\n"
         + "PROJECT QUESTION/HELP (questions about THIS user's tasks, sprint status, progress, blockers):\n"
-        + "  {\"type\":\"answer\",\"text\":\"<concise answer, max 150 words, in user's language, based only on context below>\"}\n\n"
+        + "  {\"type\":\"answer\",\"text\":\"<concise answer, max 300 words, in user's language, based only on context below>\"}\n\n"
         + "Creation rules:\n"
         + "- description: expand the user's raw input into a clear, professional 1-2 sentence description; same language as user's message\n"
         + "- storyPoints: integer 1-20; estimate from complexity; default 3 if unclear\n"
-        + "- priority: infer from urgency words; default medium\n"
+        + "- priority: assign HIGH/MEDIUM/LOW using these explicit rules:\n"
+        + "    HIGH  — text contains any of: urgente, urgently, crítico, critical, blocker, ASAP, emergencia, emergency,\n"
+        + "             breaking, production issue, hotfix, must-have, obligatorio, required, security, falla, crash\n"
+        + "    LOW   — text contains any of: nice-to-have, opcional, optional, cuando puedas, when possible,\n"
+        + "             mejora menor, minor improvement, cosmético, cosmetic, refactor, cleanup, technical debt,\n"
+        + "             futura mejora, future improvement\n"
+        + "    MEDIUM — everything else (default)\n"
         + "- Trigger words: add, create, new, agregar, crear, nueva tarea, nueva feature, hacer, añadir\n\n"
         + "Suggestion rules:\n"
-        + "- Pick the BEST pending task: highest priority first, then closest due date, then most story points\n"
+        + "- For each pending task, infer complexity from its description:\n"
+        + "    high complexity   — description contains: integrate, migrar, migrate, refactor, diseñar, design,\n"
+        + "                        implement from scratch, investigate, research, architect, rewrite, major\n"
+        + "    low complexity    — description contains: fix, update, rename, add, remove, adjust, change,\n"
+        + "                        minor, small, quick, simple, typo\n"
+        + "    medium complexity — everything else\n"
+        + "- Rank pending tasks in this order:\n"
+        + "    1. Priority (high > medium > low)\n"
+        + "    2. Among same priority: low complexity before high complexity (easier wins unblock progress)\n"
+        + "    3. Among same priority+complexity: closest due date first\n"
+        + "    4. Tiebreaker: most story points\n"
+        + "- Include complexity in the reason so the developer knows what to expect\n"
         + "- Only use task names and data exactly as listed in the context — never invent tasks\n"
         + "- If no pending tasks exist, set taskName to null\n\n"
         + "=== PROJECT CONTEXT ===\n"
@@ -2038,9 +1984,16 @@ public class BotActions {
 
         BotHelper.sendMessageToTelegram(chatId, BotMessages.ASK_AI_THINKING.getMessage(), telegramClient, null);
 
+        // RAG: retrieve relevant chunks from indexed documents
+        String ragContext = buildRagContext(sanitized);
+
         String aiResponse;
         try {
-            aiResponse = groqService.ask(buildUnifiedAiPrompt(), sanitized);
+            String systemPrompt = buildUnifiedAiPrompt();
+            if (ragContext != null) {
+                systemPrompt = systemPrompt + "\n\n" + ragContext;
+            }
+            aiResponse = groqService.ask(systemPrompt, sanitized);
         } catch (Exception e) {
             logger.error("AI unified request failed: {}", e.getMessage(), e);
             BotHelper.sendMessageToTelegram(chatId,
@@ -2127,13 +2080,18 @@ public class BotActions {
                     if (taskName == null || taskName.equals("null")) {
                         BotHelper.sendMessageToTelegram(chatId, "💡 " + reason, telegramClient, null);
                     } else {
-                        String priority = node.path("priority").asText("medium");
-                        int sp          = node.path("storyPoints").asInt(0);
-                        String due      = node.path("dueDate").asText(null);
+                        String priority   = node.path("priority").asText("medium");
+                        int sp            = node.path("storyPoints").asInt(0);
+                        String due        = node.path("dueDate").asText(null);
+                        String complexity = node.path("complexity").asText(null);
                         StringBuilder msg = new StringBuilder();
                         msg.append("💡 *Suggested next task:*\n")
                            .append("📝 ").append(taskName).append("\n")
                            .append("   Priority: ").append(prioEmoji(priority)).append(" ").append(priority);
+                        if (complexity != null && !complexity.isEmpty()) {
+                            String complexEmoji = complexity.equals("high") ? "🔴" : complexity.equals("low") ? "🟢" : "🟡";
+                            msg.append("\n   Complexity: ").append(complexEmoji).append(" ").append(complexity);
+                        }
                         if (sp > 0) msg.append("\n   Story Points: ").append(sp);
                         if (due != null && !due.isEmpty()) msg.append("\n   Due: ").append(due);
                         if (!reason.isEmpty()) msg.append("\n\n_").append(reason).append("_");
@@ -2165,14 +2123,130 @@ public class BotActions {
         }
     }
 
-    /** Entry point for "/ask <question>" or the "Ask AI" button. */
-    public void fnAsk() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
+    // ─── RAG helpers ──────────────────────────────────────────────────────
+
+    /**
+     * BM25 retrieval: search the Lucene index for chunks relevant to the query.
+     * Returns a formatted context string to prepend to the system prompt, or null
+     * if no index exists or no relevant chunks are found.
+     */
+    private String buildRagContext(String query) {
+        if (luceneService == null) return null;
+        long pjId = getUserProjectId();
+        if (pjId <= 0) return null;
+
+        List<String> chunks = luceneService.search(pjId, query, 4);
+        if (chunks.isEmpty()) return null;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("The following excerpts from project documents may be relevant to the user's question. "
+                + "Use them as additional context when answering:\n\n");
+        for (int i = 0; i < chunks.size(); i++) {
+            sb.append("--- Excerpt ").append(i + 1).append(" ---\n")
+              .append(chunks.get(i)).append("\n\n");
+        }
+        return sb.toString();
+    }
+
+    // ─── Document upload (RAG) ────────────────────────────────────────────
+
+    /**
+     * Handles /uploaddoc command: prompts user to send a file.
+     * Also handles the sentinel "/uploaddoc" set by the controller when a document
+     * message arrives (documentFileId will be set in that case).
+     */
+    public void fnUploadDocument() {
+        if (exit || !requireAuth()) return;
+
+        String cmd = requestText.trim();
+
+        // Case 1: controller already processed a document message — documentFileId is set
+        if (BotCommands.UPLOAD_DOC.getCommand().equals(cmd) && documentFileId != null) {
+            handleIncomingDocument();
             exit = true;
             return;
         }
+
+        // Case 2: user typed /uploaddoc — prompt them to send a file
+        if (BotCommands.UPLOAD_DOC.getCommand().equals(cmd)) {
+            long pjId = getUserProjectId();
+            if (pjId <= 0) {
+                BotHelper.sendMessageToTelegram(chatId,
+                    BotMessages.DOC_UPLOAD_NO_PROJECT.getMessage(), telegramClient, null);
+                exit = true;
+                return;
+            }
+            setCurrentState(BotConversationState.WAITING_DOC_FILE);
+            BotHelper.sendPromptWithCancel(chatId,
+                BotMessages.DOC_UPLOAD_PROMPT.getMessage(), telegramClient);
+            exit = true;
+            return;
+        }
+
+        // Case 3: user is in WAITING_DOC_FILE state and sent a document (controller sets requestText + documentFileId)
+        if (getCurrentState() == BotConversationState.WAITING_DOC_FILE && documentFileId != null) {
+            handleIncomingDocument();
+            exit = true;
+        }
+    }
+
+    private void handleIncomingDocument() {
+        long pjId = getUserProjectId();
+        if (pjId <= 0) {
+            BotHelper.sendMessageToTelegram(chatId,
+                BotMessages.DOC_UPLOAD_NO_PROJECT.getMessage(), telegramClient, null);
+            clearConversationState();
+            showMainMenu();
+            return;
+        }
+
+        BotHelper.sendMessageToTelegram(chatId,
+            BotMessages.DOC_UPLOAD_PROCESSING.getMessage(), telegramClient, null);
+
+        boolean ok = documentProcessingService.processAndIndex(
+            telegramClient, documentFileId, documentFileName, documentMimeType, pjId);
+
+        clearConversationState();
+        BotHelper.sendMessageToTelegram(chatId,
+            ok ? BotMessages.DOC_UPLOAD_SUCCESS.getMessage()
+               : BotMessages.DOC_UPLOAD_FAILED.getMessage(),
+            telegramClient, null);
+        showMainMenu();
+    }
+
+    /** /listdocs — shows indexed documents for the user's project. */
+    public void fnListDocs() {
+        if (exit || !requireAuth()) return;
+        if (!requestText.trim().equals(BotCommands.LIST_DOCS.getCommand())) return;
+
+        long pjId = getUserProjectId();
+        if (pjId <= 0) {
+            BotHelper.sendMessageToTelegram(chatId,
+                BotMessages.DOC_UPLOAD_NO_PROJECT.getMessage(), telegramClient, null);
+            exit = true;
+            return;
+        }
+
+        List<com.springboot.MyTodoList.model.DocumentTT> docs =
+            documentTTService.getLoadedDocumentsForProject(pjId);
+
+        if (docs.isEmpty()) {
+            BotHelper.sendMessageToTelegram(chatId,
+                BotMessages.DOC_LIST_EMPTY.getMessage(), telegramClient, null);
+        } else {
+            StringBuilder sb = new StringBuilder("📂 *Indexed documents:*\n\n");
+            for (com.springboot.MyTodoList.model.DocumentTT doc : docs) {
+                sb.append("• ").append(doc.getNamePjDoc())
+                  .append(" _(").append(doc.getDateUpload().toLocalDate()).append(")_\n");
+            }
+            BotHelper.sendMessageToTelegram(chatId, sb.toString(), telegramClient, null);
+        }
+        exit = true;
+    }
+
+    /** Entry point for "/ask <question>" or the "Ask AI" button. */
+    public void fnAsk() {
+        if (exit || !requireAuth()) return;
 
         String cmd = requestText.trim();
         String askCmd = BotCommands.ASK_COMMAND.getCommand();
@@ -2218,12 +2292,7 @@ public class BotActions {
 
     /** Entry point for the '✨ Create with AI' button. */
     public void fnAiCreate() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (exit || !requireAuth()) return;
         if (!requestText.trim().equals(BotCommands.AI_CREATE.getCommand())) return;
 
         if (groqService == null) {
@@ -2357,21 +2426,23 @@ public class BotActions {
         + "Return ONLY a valid JSON array on one line with no extra text or markdown:\n"
         + "[{\"name\":\"...\",\"description\":\"...\",\"storyPoints\":N,\"priority\":\"HIGH\"|\"MEDIUM\"|\"LOW\"}]\n"
         + "Rules:\n"
-        + "- name: short task title, max 80 chars\n"
-        + "- description: one-sentence summary; empty string \"\" if not clear\n"
+        + "- name: copy the task name EXACTLY as written in the source text — do NOT translate, rephrase, or summarize it; truncate only if over 80 chars\n"
+        + "- description: copy the task description EXACTLY as written in the source text — do NOT translate, rephrase, or summarize it; if no description is present use empty string \"\"\n"
         + "- storyPoints: integer 1-20, estimate from complexity hints; default 3\n"
-        + "- priority: infer from urgency words; default MEDIUM\n"
+        + "- priority: assign HIGH/MEDIUM/LOW using these explicit rules:\n"
+        + "    HIGH  — text for this item contains any of: urgente, urgently, crítico, critical, blocker, ASAP,\n"
+        + "             emergencia, emergency, breaking, production issue, hotfix, must-have, obligatorio,\n"
+        + "             required, security, falla, crash\n"
+        + "    LOW   — text for this item contains any of: nice-to-have, opcional, optional, cuando puedas,\n"
+        + "             when possible, mejora menor, minor improvement, cosmético, cosmetic, refactor, cleanup,\n"
+        + "             technical debt, futura mejora, future improvement\n"
+        + "    MEDIUM — everything else (default)\n"
         + "- If no tasks found, return []\n"
         + "- Do NOT wrap in code blocks or add any text outside the JSON array";
 
     /** Entry point for the '📥 Import Tasks from Text' button. */
     public void fnImportTasks() {
-        if (exit) return;
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (exit || !requireAuth()) return;
         if (!requestText.trim().equals(BotCommands.IMPORT_TASKS.getCommand())) return;
 
         if (groqService == null) {
@@ -2706,36 +2777,10 @@ public class BotActions {
         exit = true;
     }
 
-    public void fnLLM() {
-        logger.info("Calling LLM");
-        if (!requestText.contains(BotCommands.LLM_REQ.getCommand()) || exit) return;
-
-        if (deepSeekService == null) {
-            BotHelper.sendMessageToTelegram(chatId, "The LLM function is disabled.", telegramClient, null);
-            exit = true;
-            return;
-        }
-
-        String out;
-        try {
-            out = deepSeekService.generateText("Give me the weather data in mty");
-        } catch (Exception exc) {
-            logger.error(exc.getLocalizedMessage(), exc);
-            out = "Could not consult the LLM service.";
-        }
-        BotHelper.sendMessageToTelegram(chatId, "LLM: " + out, telegramClient, null);
-        exit = true;
-    }
-
     public void fnStatus() {
         if (exit) return;
         if (!requestText.trim().equals(BotCommands.STATUS.getCommand())) return;
-
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (!requireAuth()) return;
 
         UserTT user = getAuthenticatedUser();
         List<TaskTT> tasks = taskTTService.getTasksByUserInActiveSprint(user.getUserId());
@@ -2801,12 +2846,7 @@ public class BotActions {
     public void fnShowDonePicker() {
         if (exit) return;
         if (!requestText.trim().equals(BotCommands.MARK_DONE.getCommand())) return;
-
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first.", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (!requireAuth()) return;
 
         UserTT user = getAuthenticatedUser();
         List<TaskTT> pending = taskTTService.getTasksByUserInActiveSprint(user.getUserId()).stream()
@@ -2855,12 +2895,7 @@ public class BotActions {
     public void fnMarkTaskDone() {
         if (exit) return;
         if (!requestText.startsWith("DONE_TASK:")) return;
-
-        if (!isUserAuthenticated()) {
-            BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first.", telegramClient, null);
-            exit = true;
-            return;
-        }
+        if (!requireAuth()) return;
 
         long taskId;
         try {

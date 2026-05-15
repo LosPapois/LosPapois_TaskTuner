@@ -79,12 +79,10 @@ public class DocumentTTController {
 
     @DeleteMapping(value = "/documents/{id}")
     public ResponseEntity<Boolean> deleteDocument(@PathVariable long id) {
-        Boolean flag = false;
         try {
-            flag = documentTTService.deleteDocument(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            return ResponseEntity.ok(documentTTService.deleteDocument(id));
         } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+            return ResponseEntity.notFound().build();
         }
     }
 }

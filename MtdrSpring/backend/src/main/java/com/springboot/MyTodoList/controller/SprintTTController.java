@@ -119,12 +119,10 @@ public class SprintTTController {
 
     @DeleteMapping(value = "/sprints/{id}")
     public ResponseEntity<Boolean> deleteSprint(@PathVariable long id) {
-        Boolean flag = false;
         try {
-            flag = sprintTTService.deleteSprint(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            return ResponseEntity.ok(sprintTTService.deleteSprint(id));
         } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+            return ResponseEntity.notFound().build();
         }
     }
 }

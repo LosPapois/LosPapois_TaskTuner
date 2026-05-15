@@ -59,12 +59,10 @@ public class TaskTTController {
 
     @DeleteMapping(value = "/tasks/{id}")
     public ResponseEntity<Boolean> deleteTask(@PathVariable("id") long id){
-        Boolean flag = false;
-        try{
-            flag = taskTTService.deleteTask(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        }catch (Exception e){
-            return new ResponseEntity<>(flag,HttpStatus.NOT_FOUND);
+        try {
+            return ResponseEntity.ok(taskTTService.deleteTask(id));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
         }
     }
 }

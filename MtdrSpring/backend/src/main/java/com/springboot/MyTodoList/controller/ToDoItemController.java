@@ -55,12 +55,10 @@ public class ToDoItemController {
     //@CrossOrigin
     @DeleteMapping(value = "todolist/{id}")
     public ResponseEntity<Boolean> deleteToDoItem(@PathVariable("id") int id){
-        Boolean flag = false;
-        try{
-            flag = toDoItemService.deleteToDoItem(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        }catch (Exception e){
-            return new ResponseEntity<>(flag,HttpStatus.NOT_FOUND);
+        try {
+            return ResponseEntity.ok(toDoItemService.deleteToDoItem(id));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
         }
     }
 

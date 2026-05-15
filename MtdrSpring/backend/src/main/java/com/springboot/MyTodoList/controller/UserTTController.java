@@ -62,10 +62,9 @@ public class UserTTController {
     @DeleteMapping(value = "/users-tt/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable long id) {
         try {
-            Boolean flag = userTTService.deleteUser(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            return ResponseEntity.ok(userTTService.deleteUser(id));
         } catch (Exception e) {
-            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
+            return ResponseEntity.notFound().build();
         }
     }
 

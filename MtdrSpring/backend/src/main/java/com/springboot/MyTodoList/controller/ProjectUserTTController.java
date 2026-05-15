@@ -44,23 +44,19 @@ public class ProjectUserTTController {
 
     @DeleteMapping(value = "/project-memberships/project/{pjId}/user/{userId}")
     public ResponseEntity<Boolean> removeMember(@PathVariable long pjId, @PathVariable long userId) {
-        Boolean flag = false;
         try {
-            flag = projectUserTTService.removeMember(pjId, userId);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            return ResponseEntity.ok(projectUserTTService.removeMember(pjId, userId));
         } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+            return ResponseEntity.notFound().build();
         }
     }
 
     @DeleteMapping(value = "/project-memberships/project/{pjId}/user/{userId}/with-tasks")
     public ResponseEntity<Boolean> removeMemberAndTasks(@PathVariable long pjId, @PathVariable long userId) {
-        Boolean flag = false;
         try {
-            flag = projectUserTTService.removeMemberAndAssignedTasks(pjId, userId);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            return ResponseEntity.ok(projectUserTTService.removeMemberAndAssignedTasks(pjId, userId));
         } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+            return ResponseEntity.notFound().build();
         }
     }
 }
