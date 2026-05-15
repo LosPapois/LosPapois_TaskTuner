@@ -1,11 +1,20 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ChatBubbleOvalLeftIcon,
   EnvelopeIcon,
+  ExclamationTriangleIcon,
   LockClosedIcon,
+  TrashIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
-import { getFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
+import {
+  clearStorageByPattern,
+  getFromStorage,
+  saveToStorage,
+  STORAGE_KEYS,
+} from '../Utils/storage';
+import { API_CONFIG } from '../config';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -73,6 +82,8 @@ function displayRole(role: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
+  const navigate = useNavigate();
+
   // Seed from the cache filled by useLogin — the user object lands there
   // verbatim from POST /api/auth/login.
   const [user, setUser] = useState<SessionUser | null>(() =>
@@ -88,6 +99,13 @@ export default function ProfilePage() {
   const [passwords, setPasswords] = useState<PasswordData>(EMPTY_PASSWORD);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Delete-account flow state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteEmail, setDeleteEmail] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Background refresh: pull the freshest user from the backend so this page
   // reflects edits made elsewhere (Telegram bot, admin tooling, etc.).
@@ -199,6 +217,70 @@ export default function ProfilePage() {
       setError('Could not save profile. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ─── Delete account handlers ──────────────────────────────────────────────
+
+  const openDeleteModal = () => {
+    setDeleteEmail('');
+    setDeletePassword('');
+    setDeleteError(null);
+    setShowDeleteModal(true);
+  };
+
+  const closeDeleteModal = () => {
+    if (deleting) return;
+    setShowDeleteModal(false);
+    setDeleteEmail('');
+    setDeletePassword('');
+    setDeleteError(null);
+  };
+
+  // Confirm is enabled only when the typed email matches the account's email
+  // exactly (case-insensitive) AND a password has been typed. This is the
+  // "notorious verification" — a typo means the button stays disabled.
+  const emailMatches =
+    deleteEmail.trim().toLowerCase() === (user?.mail ?? '').toLowerCase();
+  const canConfirmDelete =
+    emailMatches && deletePassword.length > 0 && !deleting;
+
+  const handleDeleteAccount = async () => {
+    if (!user || !canConfirmDelete) return;
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      // Re-verify password by re-authenticating. Bypasses the global fetch
+      // wrapper's Bearer header since /api/auth/* is excluded from the
+      // backend's security filter anyway.
+      const verifyRes = await fetch(API_CONFIG.auth.login, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mail: deleteEmail.trim(), password: deletePassword }),
+      });
+      if (!verifyRes.ok) {
+        setDeleteError('Incorrect email or password.');
+        setDeleting(false);
+        return;
+      }
+
+      const delRes = await fetch(`/api/users-tt/${user.userId}`, {
+        method: 'DELETE',
+      });
+      if (!delRes.ok) {
+        throw new Error(`DELETE /api/users-tt/${user.userId} → ${delRes.status}`);
+      }
+
+      // Wipe the entire app cache so the next user starting from this browser
+      // doesn't see ghost data from the deleted session.
+      clearStorageByPattern(/^task_tuner_/);
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('[ProfilePage] delete failed', err);
+      setDeleteError('Could not delete your account. Please try again.');
+      setDeleting(false);
     }
   };
 
@@ -352,6 +434,20 @@ export default function ProfilePage() {
             </div>
           )}
 
+          {/* Delete account — destructive action, only shown when not editing */}
+          {!isEditing && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={openDeleteModal}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+              >
+                <TrashIcon className="h-5 w-5" aria-hidden="true" />
+                Delete My Account
+              </button>
+            </div>
+          )}
+
           {/* Password section — fields live inside the same form as profile */}
           {/* (no nested <form>!), so they submit together via handleSave. */}
           {/* Leaving both empty keeps the existing password untouched. */}
@@ -396,6 +492,107 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* ─── Delete-account confirmation modal ──────────────────────────── */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+        >
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
+              <ExclamationTriangleIcon
+                className="h-7 w-7 text-white"
+                aria-hidden="true"
+              />
+              <h2
+                id="delete-modal-title"
+                className="text-xl font-bold text-white"
+              >
+                Delete account permanently
+              </h2>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+                <p className="font-semibold">This action cannot be undone.</p>
+                <p className="mt-1">
+                  Your account, profile, and access to all projects will be
+                  removed immediately.
+                </p>
+              </div>
+
+              <p className="text-sm text-gray-700">
+                To confirm, type your email and password below.
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Type your email
+                </label>
+                <input
+                  type="email"
+                  value={deleteEmail}
+                  onChange={e => setDeleteEmail(e.target.value)}
+                  disabled={deleting}
+                  placeholder={user.mail || 'your@email.com'}
+                  autoComplete="off"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+                {deleteEmail.length > 0 && !emailMatches && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Email does not match the account email.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  disabled={deleting}
+                  autoComplete="current-password"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              {deleteError && (
+                <p
+                  role="alert"
+                  className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3"
+                >
+                  {deleteError}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeDeleteModal}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={!canConfirmDelete}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:bg-red-300 disabled:cursor-not-allowed"
+                >
+                  {deleting ? 'Deleting…' : 'Delete Permanently'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -44,23 +44,21 @@ public class ProjectUserTTController {
 
     @DeleteMapping(value = "/project-memberships/project/{pjId}/user/{userId}")
     public ResponseEntity<Boolean> removeMember(@PathVariable long pjId, @PathVariable long userId) {
-        Boolean flag = false;
-        try {
-            flag = projectUserTTService.removeMember(pjId, userId);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+        boolean flag = projectUserTTService.removeMember(pjId, userId);
+        if (flag) {
+            return new ResponseEntity<>(true, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
         }
     }
 
     @DeleteMapping(value = "/project-memberships/project/{pjId}/user/{userId}/with-tasks")
     public ResponseEntity<Boolean> removeMemberAndTasks(@PathVariable long pjId, @PathVariable long userId) {
-        Boolean flag = false;
-        try {
-            flag = projectUserTTService.removeMemberAndAssignedTasks(pjId, userId);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+        boolean flag = projectUserTTService.removeMemberAndAssignedTasks(pjId, userId);
+        if (flag) {
+            return new ResponseEntity<>(true, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
         }
     }
 }
