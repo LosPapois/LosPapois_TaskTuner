@@ -95,6 +95,23 @@ public class TaskTTService {
     }
 
     /**
+     * Returns the project board grouped by lifecycle column. Today's date
+     * is read once on the server so all three queries see a consistent
+     * "today" for the split between backlog (future sprint) and active.
+     *
+     * @param pjId  the project to build the board for
+     * @return Map with keys "backlog", "active", "completed"
+     */
+    public java.util.Map<String, List<TaskTT>> getProjectBoard(long pjId) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.util.Map<String, List<TaskTT>> board = new java.util.LinkedHashMap<>();
+        board.put("backlog",   taskTTRepository.findBacklogTasksByProject(pjId, today));
+        board.put("active",    taskTTRepository.findActiveTasksByProject(pjId, today));
+        board.put("completed", taskTTRepository.findCompletedTasksByProject(pjId));
+        return board;
+    }
+
+    /**
      * Returns tasks for a specific user within a specific project.
      *
      * @param pjId   the project
