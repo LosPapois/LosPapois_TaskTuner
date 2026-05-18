@@ -1,21 +1,21 @@
 package com.springboot.MyTodoList.service;
 
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.springboot.MyTodoList.model.ProjectTT;
 import com.springboot.MyTodoList.model.SprintMetricsResult;
 import com.springboot.MyTodoList.model.SprintTT;
 import com.springboot.MyTodoList.model.SprintTaskTT;
 import com.springboot.MyTodoList.repository.ProjectTTRepository;
-import com.springboot.MyTodoList.repository.SprintTaskTTRepository;
 import com.springboot.MyTodoList.repository.SprintTTRepository;
+import com.springboot.MyTodoList.repository.SprintTaskTTRepository;
 import com.springboot.MyTodoList.repository.TaskTTRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 
 /*
  * ============================================================

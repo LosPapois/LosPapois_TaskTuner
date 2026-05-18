@@ -345,7 +345,9 @@ export default function SprintPage() {
       const total = tasksOfFeature.length;
       const completed = tasksOfFeature.filter(t => t.stateTask === 'done').length;
       const sps = tasksOfFeature.reduce((sum, t) => sum + (t.storyPoints ?? 0), 0);
-      const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+      const totalW     = tasksOfFeature.reduce((sum, t) => sum + taskWeight(t), 0);
+      const completedW = tasksOfFeature.filter(t => t.stateTask === 'done').reduce((sum, t) => sum + taskWeight(t), 0);
+      const progress = totalW === 0 ? 0 : Math.round((completedW / totalW) * 100);
       const status = statusFromProgress(progress);
 
       // Developer attribution: pick the most common owner. If multiple,
