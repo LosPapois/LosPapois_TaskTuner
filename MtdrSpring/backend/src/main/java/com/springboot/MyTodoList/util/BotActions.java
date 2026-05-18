@@ -27,7 +27,10 @@ import com.springboot.MyTodoList.model.SprintTT;
 import com.springboot.MyTodoList.model.TaskTT;
 import com.springboot.MyTodoList.model.ToDoItem;
 import com.springboot.MyTodoList.model.UserTT;
+import com.springboot.MyTodoList.model.DocumentTT;
 import com.springboot.MyTodoList.service.DeepSeekService;
+import com.springboot.MyTodoList.service.DocumentProcessingService;
+import com.springboot.MyTodoList.service.DocumentTTService;
 import com.springboot.MyTodoList.service.GroqService;
 import com.springboot.MyTodoList.service.FeatureTTService;
 import com.springboot.MyTodoList.service.ProjectTTService;
@@ -67,6 +70,8 @@ public class BotActions {
     SprintTaskTTService sprintTaskTTService;
     TaskTTService taskTTService;
     FeatureTTService featureTTService;
+    DocumentTTService documentTTService;
+    DocumentProcessingService documentProcessingService;
 
     private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
@@ -75,7 +80,8 @@ public class BotActions {
             UserTTService uts, SprintTTService stts,
             ProjectTTService ptts, ProjectUserTTService puts,
             SprintTaskTTService sttts,
-            TaskTTService ttts, FeatureTTService ftts) {
+            TaskTTService ttts, FeatureTTService ftts,
+            DocumentTTService dtts, DocumentProcessingService dps) {
         telegramClient = tc;
         todoService = ts;
         deepSeekService = ds;
@@ -87,6 +93,8 @@ public class BotActions {
         sprintTaskTTService = sttts;
         taskTTService = ttts;
         featureTTService = ftts;
+        documentTTService = dtts;
+        documentProcessingService = dps;
         exit = false;
     }
 
@@ -2059,9 +2067,9 @@ public class BotActions {
         } else {
             for (TaskTT t : pending) {
                 String featureName = t.getFeatureId() != null
-                        ? featureTTService.getFeatureById(t.getFeatureId()).orElse(null) != null
-                                ? featureTTService.getFeatureById(t.getFeatureId()).orElse(null).getNameFeature()
-                                : "unknown feature"
+                        ? featureTTService.getFeatureById(t.getFeatureId())
+                                .map(FeatureTT::getNameFeature)
+                                .orElse("unknown feature")
                         : "no feature";
                 ctx.append("  [").append(t.getPriority().toUpperCase()).append("] ")
                         .append(t.getNameTask())
@@ -2083,21 +2091,6 @@ public class BotActions {
             }
         }
         ctx.append("\n");
-
-        // ── Features in the active sprint ─────────────────────────────────────
-        if (activeSprint != null) {
-            List<FeatureTT> features = featureTTService.getFeaturesBySprint(activeSprint.getSprId());
-            if (!features.isEmpty()) {
-                ctx.append("=== SPRINT FEATURES ===\n");
-                for (FeatureTT f : features) {
-                    ctx.append("  [").append(f.getPriorityFeature().toUpperCase()).append("] ")
-                            .append(f.getNameFeature()).append("\n");
-                }
-
-                ctx.append("  Summary: ").append(allFeatures.size()).append(" features total, ")
-                   .append(untouched).append(" with no completed tasks yet.\n\n");
-            }
-        }
 
         return ctx.toString();
     }
@@ -2188,7 +2181,12 @@ public class BotActions {
 
         String aiResponse;
         try {
-            aiResponse = groqService.ask(buildUnifiedAiPrompt(), sanitized);
+            String systemPrompt = buildUnifiedAiPrompt();
+            String ragContext = buildRagContext(sanitized);
+            if (ragContext != null) {
+                systemPrompt = systemPrompt + "\n\n" + ragContext;
+            }
+            aiResponse = groqService.ask(systemPrompt, sanitized);
         } catch (Exception e) {
             logger.error("AI unified request failed: {}", e.getMessage(), e);
             BotHelper.sendMessageToTelegram(chatId,
@@ -3133,5 +3131,91 @@ public class BotActions {
         }
         sb.append(s);
         return sb.toString();
+    }
+
+    /**
+     * Handles a document (PDF or text file) sent by the user via Telegram.
+     * Downloads the file, extracts text with PDFBox, stores in DOCUMENT_TT,
+     * and replies with a confirmation message.
+     *
+     * @param fileId   Telegram file_id from the received document
+     * @param fileName original file name (e.g. "sprint-plan.pdf")
+     */
+    public void fnDocument(String fileId, String fileName) {
+        UserTT user = getAuthenticatedUser();
+        if (user == null) {
+            BotHelper.sendMessageToTelegram(chatId,
+                "⚠️ You need to log in before uploading documents. Use /start.", telegramClient, null);
+            return;
+        }
+
+        if (documentProcessingService == null) {
+            BotHelper.sendMessageToTelegram(chatId,
+                "❌ Document processing is not available.", telegramClient, null);
+            return;
+        }
+
+        // Derive pjId from user's tasks (same logic as buildContextString)
+        List<TaskTT> allUserTasks = taskTTService.getTasksByUser(user.getUserId());
+        long pjId = allUserTasks.stream()
+                .filter(t -> t.getPjId() > 0)
+                .mapToLong(TaskTT::getPjId)
+                .findFirst()
+                .orElse(0L);
+
+        if (pjId == 0L) {
+            BotHelper.sendMessageToTelegram(chatId,
+                "⚠️ Could not determine your project. Assign yourself to a task first.", telegramClient, null);
+            return;
+        }
+
+        BotHelper.sendMessageToTelegram(chatId,
+            "⏳ Processing *" + fileName + "*...", telegramClient, null);
+
+        DocumentTT result = documentProcessingService.processAndIndex(telegramClient, fileId, fileName, pjId);
+
+        if (result != null) {
+            String msg = result.getExtractedText() != null
+                    ? "✅ *" + fileName + "* saved and indexed for your project."
+                    : "✅ *" + fileName + "* saved.\n⚠️ No text could be extracted.";
+            BotHelper.sendMessageToTelegram(chatId, msg, telegramClient, null);
+        } else {
+            BotHelper.sendMessageToTelegram(chatId,
+                "❌ Failed to process *" + fileName + "*. Make sure it's a valid PDF or text file.", telegramClient, null);
+        }
+    }
+
+    /**
+     * Builds RAG context from indexed documents for this user's project.
+     * Injects up to 3 documents' extracted text into the AI prompt.
+     */
+    private String buildRagContext(String query) {
+        if (documentTTService == null) return null;
+
+        UserTT user = getAuthenticatedUser();
+        if (user == null) return null;
+
+        List<TaskTT> allUserTasks = taskTTService.getTasksByUser(user.getUserId());
+        long pjId = allUserTasks.stream()
+                .filter(t -> t.getPjId() > 0)
+                .mapToLong(TaskTT::getPjId)
+                .findFirst()
+                .orElse(0L);
+        if (pjId == 0L) return null;
+
+        List<DocumentTT> docs = documentTTService.getLoadedDocumentsForProject(pjId);
+        if (docs.isEmpty()) return null;
+
+        StringBuilder rag = new StringBuilder("=== PROJECT DOCUMENTS (for context) ===\n");
+        int count = 0;
+        for (DocumentTT doc : docs) {
+            if (doc.getExtractedText() == null || doc.getExtractedText().isBlank()) continue;
+            if (count++ >= 3) break;
+            rag.append("--- ").append(doc.getNamePjDoc()).append(" ---\n")
+               .append(doc.getExtractedText(), 0,
+                       Math.min(doc.getExtractedText().length(), 3000))
+               .append("\n\n");
+        }
+        return count == 0 ? null : rag.toString();
     }
 }

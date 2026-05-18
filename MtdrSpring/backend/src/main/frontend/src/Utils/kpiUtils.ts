@@ -27,14 +27,24 @@ export const ZERO_KPIS: ComputedKpis = {
   totalTasks: 0,
 };
 
+/** Priority weight matching backend formula: high=3, medium=2, low=1. */
+export function taskWeight(t: { priority?: string | null; storyPoints?: number | null }): number {
+  const sp = t.storyPoints ?? 1;
+  const w  = t.priority === 'high' ? 3 : t.priority === 'medium' ? 2 : 1;
+  return sp * w;
+}
+
 /**
  * Derive the four sprint KPIs from the joined task list.
+ * progress and carryRate use weighted SP × priority — same formula as backend KpisRepository.
  */
 export function computeSprintKpis(tasks: SprintTaskJoined[]): ComputedKpis {
   const total = tasks.length;
   if (total === 0) return ZERO_KPIS;
 
-  const done    = tasks.filter(t => t.stateTask === 'done').length;
+  const totalWeight   = tasks.reduce((sum, t) => sum + taskWeight(t), 0);
+  const doneWeight    = tasks.filter(t => t.stateTask === 'done').reduce((sum, t) => sum + taskWeight(t), 0);
+  const delayedWeight = tasks.filter(t => t.stateTask === 'delayed').reduce((sum, t) => sum + taskWeight(t), 0);
   const delayed = tasks.filter(t => t.stateTask === 'delayed').length;
 
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -42,7 +52,6 @@ export function computeSprintKpis(tasks: SprintTaskJoined[]): ComputedKpis {
     t => t.stateTask !== 'done' && t.dateEndSetTask != null && t.dateEndSetTask < todayIso
   ).length;
 
-  // Cycle time only meaningful for tasks that actually closed.
   const completed = tasks.filter(
     t => t.stateTask === 'done' && t.dateStartTask && t.dateEndRealTask
   );
@@ -56,8 +65,8 @@ export function computeSprintKpis(tasks: SprintTaskJoined[]): ComputedKpis {
       }, 0) / completed.length;
 
   return {
-    progress:        Math.round((done / total) * 100),
-    carryRate:       Math.round((delayed / total) * 100),
+    progress:        totalWeight === 0 ? 0 : Math.round((doneWeight    / totalWeight) * 100),
+    carryRate:       totalWeight === 0 ? 0 : Math.round((delayedWeight / totalWeight) * 100),
     carriedFeatures: delayed,
     totalFeatures:   total,
     taskDelay:       Math.round((overdue / total) * 100),

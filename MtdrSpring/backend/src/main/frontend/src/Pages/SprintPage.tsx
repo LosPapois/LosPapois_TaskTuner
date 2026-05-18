@@ -50,7 +50,7 @@ import {
 } from '../Utils/types';
 import { mapTaskPriority, normalizeTaskState, formatDate } from '../Utils/helpers';
 import { MOCK_SPRINT_BASE } from '../Utils/mockData';
-import { SprintTaskJoined, ComputedKpis, computeSprintKpis } from '../Utils/kpiUtils';
+import { SprintTaskJoined, ComputedKpis, computeSprintKpis, taskWeight } from '../Utils/kpiUtils';
 
 
 
