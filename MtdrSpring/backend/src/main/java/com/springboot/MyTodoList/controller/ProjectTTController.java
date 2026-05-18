@@ -6,8 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-import java.net.URI;
 
 import java.util.List;
 import java.util.Map;
@@ -19,81 +17,59 @@ public class ProjectTTController {
     @Autowired
     private ProjectTTService projectTTService;
 
-    @GetMapping(value = "/projects")
+    @GetMapping("/projects")
     public List<ProjectTT> getAllProjects() {
         return projectTTService.findAll();
     }
 
-    @GetMapping(value = "/projects/open")
+    @GetMapping("/projects/open")
     public List<ProjectTT> getOpenProjects() {
         return projectTTService.getOpenProjects();
     }
 
-    @GetMapping(value = "/projects/search")
+    @GetMapping("/projects/search")
     public List<ProjectTT> searchProjects(@RequestParam String keyword) {
         return projectTTService.searchByName(keyword);
     }
 
-    @GetMapping(value = "/projects/{id}")
+    @GetMapping("/projects/{id}")
     public ResponseEntity<ProjectTT> getProjectById(@PathVariable long id) {
-        return projectTTService.getProjectById(id)
-                .map(project -> new ResponseEntity<>(project, HttpStatus.OK))
-                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+        return ControllerHelper.okOrNotFound(projectTTService.getProjectById(id));
     }
 
-    @PostMapping(value = "/projects")
+    @PostMapping("/projects")
     public ResponseEntity<ProjectTT> addProject(@RequestBody ProjectTT project) {
         ProjectTT saved = projectTTService.addProject(project);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}")
-                .buildAndExpand(saved.getPjId())
-                .toUri();
-        return ResponseEntity.created(location)
-                .header("Access-Control-Expose-Headers", "Location")
-                .body(saved);
+        return ControllerHelper.created(saved, saved.getPjId());
     }
 
-    @PutMapping(value = "/projects/{id}")
+    @PutMapping("/projects/{id}")
     public ResponseEntity<ProjectTT> updateProject(@RequestBody ProjectTT project, @PathVariable long id) {
-        ProjectTT updated = projectTTService.updateProject(id, project);
-        if (updated == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-        return new ResponseEntity<>(updated, HttpStatus.OK);
+        return ControllerHelper.okOrNotFound(projectTTService.updateProject(id, project));
     }
 
-    @PatchMapping(value = "/projects/{id}/settings")
+    @PatchMapping("/projects/{id}/settings")
     public ResponseEntity<ProjectTT> updateProjectSettings(
             @PathVariable long id,
             @RequestBody Map<String, Object> body) {
         try {
             String namePj = (String) body.getOrDefault("namePj", null);
-            boolean autoRollover = Boolean.TRUE.equals(body.get("autoRollover"));
+            boolean autoRollover    = Boolean.TRUE.equals(body.get("autoRollover"));
             boolean autoCloseSprints = Boolean.TRUE.equals(body.get("autoCloseSprints"));
             ProjectTT updated = projectTTService.updateProjectSettings(id, namePj, autoRollover, autoCloseSprints);
-            if (updated == null) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            return new ResponseEntity<>(updated, HttpStatus.OK);
+            return ControllerHelper.okOrNotFound(updated);
         } catch (Exception e) {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    @PatchMapping(value = "/projects/{id}/close")
+    @PatchMapping("/projects/{id}/close")
     public ResponseEntity<ProjectTT> closeProject(@PathVariable long id) {
-        ProjectTT updated = projectTTService.closeProject(id);
-        if (updated == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-        return new ResponseEntity<>(updated, HttpStatus.OK);
+        return ControllerHelper.okOrNotFound(projectTTService.closeProject(id));
     }
 
-    @DeleteMapping(value = "/projects/{id}")
+    @DeleteMapping("/projects/{id}")
     public ResponseEntity<Boolean> deleteProject(@PathVariable long id) {
-        boolean flag = projectTTService.deleteProject(id);
-        if (flag) {
-            return new ResponseEntity<>(true, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-        }
+        return ControllerHelper.deleted(projectTTService.deleteProject(id));
     }
 }
