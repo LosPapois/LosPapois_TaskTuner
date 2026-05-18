@@ -80,21 +80,19 @@ public class DocumentTT {
     @Column(name = "PJ_ID")
     private long pjId;
 
+    /*
+     * Full extracted text from the document (PDF text via PDFBox).
+     * Stored as CLOB in Oracle. Used directly for RAG context injection.
+     * Requires: ALTER TABLE document_tt ADD (extracted_text CLOB);
+     */
+    @Lob
+    @Column(name = "EXTRACTED_TEXT")
+    private String extractedText;
+
     // ─── Constructors ────────────────────────────────────────────────────
 
     /** Required no-args constructor for JPA. */
     public DocumentTT() {}
-
-    /** Full constructor for programmatic document creation. */
-    public DocumentTT(long docId, String namePjDoc, String urlObjStore,
-                      LocalDateTime dateUpload, String embedStatus, long pjId) {
-        this.docId       = docId;
-        this.namePjDoc   = namePjDoc;
-        this.urlObjStore = urlObjStore;
-        this.dateUpload  = dateUpload;
-        this.embedStatus = embedStatus;
-        this.pjId        = pjId;
-    }
 
     // ─── Getters & Setters ───────────────────────────────────────────────
 
@@ -115,4 +113,7 @@ public class DocumentTT {
 
     public long getPjId()                          { return pjId; }
     public void setPjId(long pjId)                 { this.pjId = pjId; }
+
+    public String getExtractedText()                        { return extractedText; }
+    public void setExtractedText(String extractedText)      { this.extractedText = extractedText; }
 }

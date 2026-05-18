@@ -30,6 +30,10 @@ public class FeatureTTService {
         return featureTTRepository.findFeaturesInActiveSprintForUser(userId);
     }
 
+    public List<FeatureTT> getFeaturesByProject(long pjId) {
+        return featureTTRepository.findAllByProjectId(pjId);
+    }
+
     public Long getStoryPoints(long featureId) {
         return featureTTRepository.sumStoryPointsByFeature(featureId);
     }
