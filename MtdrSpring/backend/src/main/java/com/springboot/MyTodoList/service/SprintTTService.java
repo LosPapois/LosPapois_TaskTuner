@@ -198,15 +198,7 @@ public class SprintTTService {
         if (nextSprintId != null) {
             Optional<ProjectTT> projectOpt = projectTTRepository.findById(sprint.getPjId());
             if (projectOpt.isPresent() && projectOpt.get().isAutoRollover()) {
-                List<SprintTaskTT> active  = sprintTaskTTRepository.findByIdSprIdAndStateTask(sprId, "active");
-                List<SprintTaskTT> delayed = sprintTaskTTRepository.findByIdSprIdAndStateTask(sprId, "delayed");
-
-                for (SprintTaskTT st : active) {
-                    sprintTaskTTRepository.save(new SprintTaskTT(nextSprintId, st.getId().getTaskId(), "active"));
-                }
-                for (SprintTaskTT st : delayed) {
-                    sprintTaskTTRepository.save(new SprintTaskTT(nextSprintId, st.getId().getTaskId(), "active"));
-                }
+                rolloverTasks(sprId, nextSprintId);
             }
         }
 
@@ -256,21 +248,24 @@ public class SprintTTService {
             nextSprint.setStateSprint("active");
             sprintTTRepository.save(nextSprint);
 
-            // Rollover incomplete tasks if project has it enabled
             Optional<ProjectTT> projectOpt = projectTTRepository.findById(sprint.getPjId());
             if (projectOpt.isPresent() && projectOpt.get().isAutoRollover()) {
-                List<SprintTaskTT> active  = sprintTaskTTRepository.findByIdSprIdAndStateTask(sprId, "active");
-                List<SprintTaskTT> delayed = sprintTaskTTRepository.findByIdSprIdAndStateTask(sprId, "delayed");
-                for (SprintTaskTT st : active) {
-                    sprintTaskTTRepository.save(new SprintTaskTT(nextSprint.getSprId(), st.getId().getTaskId(), "active"));
-                }
-                for (SprintTaskTT st : delayed) {
-                    sprintTaskTTRepository.save(new SprintTaskTT(nextSprint.getSprId(), st.getId().getTaskId(), "active"));
-                }
+                rolloverTasks(sprId, nextSprint.getSprId());
             }
         }
 
         return nextSprint;
+    }
+
+    private void rolloverTasks(long fromSprId, long toSprId) {
+        List<SprintTaskTT> active  = sprintTaskTTRepository.findByIdSprIdAndStateTask(fromSprId, "active");
+        List<SprintTaskTT> delayed = sprintTaskTTRepository.findByIdSprIdAndStateTask(fromSprId, "delayed");
+        for (SprintTaskTT st : active) {
+            sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), "active"));
+        }
+        for (SprintTaskTT st : delayed) {
+            sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), "active"));
+        }
     }
 
     // ─── Business Logic (Stored Procedure Equivalents) ───────────────────
