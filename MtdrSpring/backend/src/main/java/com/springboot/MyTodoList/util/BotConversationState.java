@@ -43,4 +43,6 @@ public enum BotConversationState {
     WAITING_IMPORT_SPRINT,
     WAITING_IMPORT_FEATURE,
     WAITING_IMPORT_CONFIRM,
+    // RAG document upload flow
+    WAITING_DOC_FILE,
 }
