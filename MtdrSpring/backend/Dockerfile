@@ -7,26 +7,12 @@ WORKDIR /tmp/
 EXPOSE 8080
 COPY target/MyTodoList-0.0.1-SNAPSHOT.jar MyTodoList.jar
 
-ARG UI_USERNAME
-ARG UI_PASSWORD
-ARG DB_USER
-ARG DBPASSWORD
-ARG DB_URL
-ARG DRIVER_CLASS_NAME
+ENV ui_username="admin"
+ENV ui_password="none0001"
 
-ARG DEEPSEEK_API_KEY
-ARG TELEGRAM_BOT_TOKEN
-ARG TELEGRAM_BOT_NAME
-
-ENV ui_username=${UI_USERNAME}
-ENV ui_password=${UI_PASSWORD}
-ENV db_user=${DB_USER}
-ENV dbpassword=${DBPASSWORD}
-ENV db_url=${DB_URL}
-ENV driver_class_name=${DRIVER_CLASS_NAME}
-
-ENV deepseek_api_key=${DEEPSEEK_API_KEY}
-ENV telegram_bot_token=${TELEGRAM_BOT_TOKEN}
-ENV telegram_bot_name=${TELEGRAM_BOT_NAME}
+ENV db_user="LOSPAPOIS"
+ENV dbpassword="None00010001"
+ENV db_url="jdbc:oracle:thin:@tasktuner_tp?TNS_ADMIN=/mtdrworkshop/creds"
+ENV driver_class_name="oracle.jdbc.OracleDriver"
 
 ENTRYPOINT ["java","-jar","MyTodoList.jar"]
