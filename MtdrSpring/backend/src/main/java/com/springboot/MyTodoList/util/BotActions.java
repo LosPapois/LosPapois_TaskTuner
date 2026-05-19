@@ -330,8 +330,7 @@ public class BotActions {
         }
 
         String cmd = requestText.trim();
-        if (!cmd.equals(BotCommands.MARK_UNDO.getCommand())
-                && !cmd.equals(BotCommands.MARK_REWORK.getCommand()))
+        if (!cmd.equals(BotCommands.MARK_UNDO.getCommand()))
             return;
 
         UserTT user = getAuthenticatedUser();
