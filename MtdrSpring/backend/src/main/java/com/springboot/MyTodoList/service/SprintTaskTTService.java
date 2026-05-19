@@ -103,6 +103,14 @@ public class SprintTaskTTService {
         return sprintTaskTTRepository.countByIdSprIdAndStateTask(sprId, stateTask);
     }
 
+    public long countTasksByFeature(long featureId) {
+        return sprintTaskTTRepository.countTasksByFeatureId(featureId);
+    }
+
+    public long countDoneTasksByFeature(long featureId) {
+        return sprintTaskTTRepository.countDoneTasksByFeatureId(featureId);
+    }
+
     // ─── Write Operations ─────────────────────────────────────────────────
 
     /**

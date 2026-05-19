@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { PencilSquareIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export type TaskDetailPriority = 'high' | 'medium' | 'low' | 'none';
 
@@ -36,6 +36,12 @@ export interface TaskDetailModalProps {
    * is expected to close this modal and open its own edit form on click.
    */
   onEdit?: () => void;
+  /**
+   * When provided, a destructive "Delete" button is rendered on the far
+   * left of the footer. The parent should open its own confirmation modal
+   * before performing the actual deletion.
+   */
+  onDelete?: () => void;
 }
 
 /**
@@ -47,6 +53,7 @@ export default function TaskDetailModal({
   onClose,
   task,
   onEdit,
+  onDelete,
 }: TaskDetailModalProps) {
   // Escape pattern shared with AddSprintModal
   useEffect(() => {
@@ -140,23 +147,36 @@ export default function TaskDetailModal({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
-          {onEdit && (
+        {/* Footer — destructive action lives on the far left, primary on the right */}
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center gap-2">
+          <div>
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white border border-red-300 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-colors shadow-sm"
+              >
+                <TrashIcon className="w-4 h-4" aria-hidden="true" />
+                Delete
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
             <button
-              onClick={onEdit}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-brand text-white rounded-xl font-semibold hover:bg-brand-dark transition-colors shadow-sm"
+              onClick={onClose}
+              className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors shadow-sm"
             >
-              <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
-              Edit
+              Close
             </button>
-          )}
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors shadow-sm"
-          >
-            Close
-          </button>
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-brand text-white rounded-xl font-semibold hover:bg-brand-dark transition-colors shadow-sm"
+              >
+                <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
+                Edit
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
