@@ -384,10 +384,20 @@ export default function ProjectsPage() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const loadProjects = useCallback(async (): Promise<Project[]> => {
-    const res = await fetch('/api/projects/open');
-    if (!res.ok) throw new Error(`GET /api/projects/open → ${res.status}`);
+    // Scope the project list to the logged-in user, then filter to the
+    // open ones (no real end date) client-side so this page only ever
+    // shows the user's own active projects.
+    const currentUser = getFromStorage<{ userId?: number }>(STORAGE_KEYS.USER);
+    if (!currentUser?.userId) {
+      setProjects([]);
+      return [];
+    }
+    const res = await fetch(`/api/projects/user/${currentUser.userId}`);
+    if (!res.ok) throw new Error(`GET /api/projects/user → ${res.status}`);
     const data: ProjectDTO[] = await res.json();
-    const mapped = data.map(toProject);
+    const mapped = data
+      .filter(p => !p.dateEndRealPj)
+      .map(toProject);
     setProjects(mapped);
     return mapped;
   }, []);
