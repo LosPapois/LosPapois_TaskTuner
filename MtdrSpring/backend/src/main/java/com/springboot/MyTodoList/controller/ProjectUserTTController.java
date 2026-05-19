@@ -16,49 +16,38 @@ public class ProjectUserTTController {
     @Autowired
     private ProjectUserTTService projectUserTTService;
 
-    @GetMapping(value = "/project-memberships")
+    @GetMapping("/project-memberships")
     public List<ProjectUserTT> getAllMemberships() {
         return projectUserTTService.findAll();
     }
 
-    @GetMapping(value = "/project-memberships/project/{pjId}")
+    @GetMapping("/project-memberships/project/{pjId}")
     public List<ProjectUserTT> getMembersOfProject(@PathVariable long pjId) {
         return projectUserTTService.getMembersOfProject(pjId);
     }
 
-    @GetMapping(value = "/project-memberships/user/{userId}")
+    @GetMapping("/project-memberships/user/{userId}")
     public List<ProjectUserTT> getProjectsForUser(@PathVariable long userId) {
         return projectUserTTService.getProjectsForUser(userId);
     }
 
-    @GetMapping(value = "/project-memberships/project/{pjId}/user/{userId}")
+    @GetMapping("/project-memberships/project/{pjId}/user/{userId}")
     public ResponseEntity<Boolean> isMember(@PathVariable long pjId, @PathVariable long userId) {
         return new ResponseEntity<>(projectUserTTService.isMember(pjId, userId), HttpStatus.OK);
     }
 
-    @PostMapping(value = "/project-memberships")
+    @PostMapping("/project-memberships")
     public ResponseEntity<ProjectUserTT> addMember(@RequestParam long pjId, @RequestParam long userId) {
-        ProjectUserTT membership = projectUserTTService.addMember(pjId, userId);
-        return new ResponseEntity<>(membership, HttpStatus.OK);
+        return new ResponseEntity<>(projectUserTTService.addMember(pjId, userId), HttpStatus.OK);
     }
 
-    @DeleteMapping(value = "/project-memberships/project/{pjId}/user/{userId}")
+    @DeleteMapping("/project-memberships/project/{pjId}/user/{userId}")
     public ResponseEntity<Boolean> removeMember(@PathVariable long pjId, @PathVariable long userId) {
-        boolean flag = projectUserTTService.removeMember(pjId, userId);
-        if (flag) {
-            return new ResponseEntity<>(true, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-        }
+        return ControllerHelper.deleted(projectUserTTService.removeMember(pjId, userId));
     }
 
-    @DeleteMapping(value = "/project-memberships/project/{pjId}/user/{userId}/with-tasks")
+    @DeleteMapping("/project-memberships/project/{pjId}/user/{userId}/with-tasks")
     public ResponseEntity<Boolean> removeMemberAndTasks(@PathVariable long pjId, @PathVariable long userId) {
-        boolean flag = projectUserTTService.removeMemberAndAssignedTasks(pjId, userId);
-        if (flag) {
-            return new ResponseEntity<>(true, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-        }
+        return ControllerHelper.deleted(projectUserTTService.removeMemberAndAssignedTasks(pjId, userId));
     }
 }

@@ -10,6 +10,14 @@ export interface NewTaskData {
   userId: number;
   /** ISO date (yyyy-mm-dd) from <input type="date">, optional. */
   dateEndSetTask?: string;
+  /** Optional feature to group this task under. */
+  featureId?: number | null;
+}
+
+/** Lightweight feature shape the modal needs for the assignee dropdown. */
+export interface FeatureOption {
+  featureId: number;
+  nameFeature: string;
 }
 
 /**
@@ -24,6 +32,7 @@ export interface InitialTaskValues {
   storyPoints?: number | null;
   userId?: number | null;
   dateEndSetTask?: string | null;
+  featureId?: number | null;
 }
 
 export interface AddTaskModalProps {
@@ -33,6 +42,11 @@ export interface AddTaskModalProps {
   projectId: number;
   /** Map<userId, displayName> already loaded by the parent page. */
   usersById: Map<number, string>;
+  /**
+   * Features available in the current sprint — used to populate the optional
+   * feature dropdown so the new task can be linked at creation time.
+   */
+  features?: FeatureOption[];
   /** Called with the validated payload. Parent handles the POSTs + refresh. */
   onCreate: (data: NewTaskData) => Promise<void> | void;
   /**
@@ -64,6 +78,9 @@ const EMPTY_FORM = {
   storyPoints: '',
   userId: '' as number | '',
   dateEndSetTask: '',
+  // '' = "(No feature)" — sentinel that lets the dropdown stay controlled
+  // while still expressing "leave the FK null".
+  featureId: '' as number | '',
 };
 
 /**
@@ -79,6 +96,7 @@ export default function AddTaskModal({
   onClose,
   projectId,
   usersById,
+  features,
   onCreate,
   initialTask,
 }: AddTaskModalProps) {
@@ -107,6 +125,7 @@ export default function AddTaskModal({
         // Backend may send full ISO ('2026-05-12T00:00:00') — slice to yyyy-mm-dd
         // so <input type="date"> accepts it.
         dateEndSetTask: initialTask.dateEndSetTask ? initialTask.dateEndSetTask.slice(0, 10) : '',
+        featureId:      initialTask.featureId ?? '',
       });
     } else {
       setForm(EMPTY_FORM);
@@ -180,6 +199,8 @@ export default function AddTaskModal({
         storyPoints,
         userId: Number(form.userId),
         dateEndSetTask: form.dateEndSetTask || undefined,
+        // null = "no feature" (sentinel empty string) → unset the FK.
+        featureId: form.featureId === '' ? null : Number(form.featureId),
       });
       onClose();
     } catch (err) {
@@ -309,6 +330,29 @@ export default function AddTaskModal({
               </option>
               {assigneeOptions.map(o => (
                 <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="task-feature" className="block text-sm font-semibold text-gray-800 mb-2">
+              Feature <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <select
+              id="task-feature"
+              value={form.featureId}
+              onChange={e => setForm(p => ({
+                ...p,
+                featureId: e.target.value === '' ? '' : Number(e.target.value),
+              }))}
+              disabled={submitting}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm bg-white
+                         focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand
+                         transition-colors disabled:opacity-60"
+            >
+              <option value="">(No feature)</option>
+              {(features ?? []).map(f => (
+                <option key={f.featureId} value={f.featureId}>{f.nameFeature}</option>
               ))}
             </select>
           </div>
