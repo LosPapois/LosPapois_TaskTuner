@@ -4,6 +4,8 @@ import com.springboot.MyTodoList.model.SprintTaskKey;
 import com.springboot.MyTodoList.model.SprintTaskTT;
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
@@ -92,4 +94,12 @@ public interface SprintTaskTTRepository extends JpaRepository<SprintTaskTT, Spri
      * e.g., countByIdSprIdAndStateTask(1L, "done") / countByIdSprId(1L) * 100
      */
     long countByIdSprIdAndStateTask(long sprId, String stateTask);
+
+    @Query("SELECT COUNT(st) FROM SprintTaskTT st JOIN TaskTT t ON t.taskId = st.id.taskId " +
+           "WHERE t.featureId = :featureId")
+    long countTasksByFeatureId(@Param("featureId") long featureId);
+
+    @Query("SELECT COUNT(st) FROM SprintTaskTT st JOIN TaskTT t ON t.taskId = st.id.taskId " +
+           "WHERE t.featureId = :featureId AND st.stateTask = 'done'")
+    long countDoneTasksByFeatureId(@Param("featureId") long featureId);
 }

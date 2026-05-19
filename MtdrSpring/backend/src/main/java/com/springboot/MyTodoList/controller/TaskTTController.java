@@ -6,10 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-import java.net.URI;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST controller for TaskTT (project tasks) CRUD operations.
@@ -22,81 +21,48 @@ import java.util.List;
  *   GET    /api/tasks/{id}                  — single task by PK
  *   POST   /api/tasks                       — create task, returns 201 + Location
  *   PUT    /api/tasks/{id}                  — full replacement update
- *   DELETE /api/tasks/{id}                  — remove task, returns boolean body
+ *   DELETE /api/tasks/{id}                  — remove task
  */
 @RestController
 @RequestMapping("/api")
 public class TaskTTController {
+
     @Autowired
     private TaskTTService taskTTService;
 
-    @GetMapping(value = "/tasks")
+    @GetMapping("/tasks")
     public List<TaskTT> getAllTasks() {
         return taskTTService.findAll();
     }
 
-    @GetMapping(value = "/projects/{pjId}/tasks")
+    @GetMapping("/projects/{pjId}/tasks")
     public List<TaskTT> getTasksByProject(@PathVariable long pjId) {
         return taskTTService.getTasksByProject(pjId);
     }
 
-    /**
-     * Project board grouped by lifecycle column.
-     * Returns { "backlog": [...], "active": [...], "completed": [...] }.
-     */
-    @GetMapping(value = "/projects/{pjId}/board")
-    public ResponseEntity<java.util.Map<String, List<TaskTT>>> getProjectBoard(@PathVariable long pjId) {
+    @GetMapping("/projects/{pjId}/board")
+    public ResponseEntity<Map<String, List<TaskTT>>> getProjectBoard(@PathVariable long pjId) {
         return new ResponseEntity<>(taskTTService.getProjectBoard(pjId), HttpStatus.OK);
     }
 
-    @GetMapping(value = "/tasks/{id}")
+    @GetMapping("/tasks/{id}")
     public ResponseEntity<TaskTT> getTaskById(@PathVariable long id) {
-        return taskTTService.getTaskById(id)
-                .map(task -> new ResponseEntity<>(task, HttpStatus.OK))
-                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+        return ControllerHelper.okOrNotFound(taskTTService.getTaskById(id));
     }
 
-    /**
-     * Creates a new task and returns HTTP 201 with a {@code Location} header
-     * pointing to the newly created resource (/api/tasks/{id}).
-     * The header is explicitly exposed via {@code Access-Control-Expose-Headers}
-     * so the frontend can read it across origins.
-     */
-    @PostMapping(value = "/tasks")
+    @PostMapping("/tasks")
     public ResponseEntity<TaskTT> addTask(@RequestBody TaskTT task) {
         TaskTT saved = taskTTService.addTask(task);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}")
-                .buildAndExpand(saved.getTaskId())
-                .toUri();
-        return ResponseEntity.created(location)
-                .header("Access-Control-Expose-Headers", "Location")
-                .body(saved);
+        return ControllerHelper.created(saved, saved.getTaskId());
     }
 
-    @PutMapping(value = "/tasks/{id}")
+    @PutMapping("/tasks/{id}")
     public ResponseEntity<TaskTT> updateTask(@RequestBody TaskTT task, @PathVariable long id) {
-        TaskTT updated = taskTTService.updateTask(id, task);
-        if (updated == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-        return new ResponseEntity<>(updated, HttpStatus.OK);
+        return ControllerHelper.okOrNotFound(taskTTService.updateTask(id, task));
     }
 
-    /**
-     * Deletes a task by ID.
-     * Returns {@code true} with 200 OK on success, or {@code false} with
-     * 404 NOT_FOUND when the task does not exist. The boolean body lets the
-     * frontend distinguish a successful delete from a missing-resource delete
-     * without parsing an error payload.
-     */
-    @DeleteMapping(value = "/tasks/{id}")
-    public ResponseEntity<Boolean> deleteTask(@PathVariable("id") long id) {
-        boolean flag = taskTTService.deleteTask(id);
-        if (flag) {
-            return new ResponseEntity<>(true, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-        }
+    @DeleteMapping("/tasks/{id}")
+    public ResponseEntity<Boolean> deleteTask(@PathVariable long id) {
+        return ControllerHelper.deleted(taskTTService.deleteTask(id));
     }
 }
