@@ -113,16 +113,19 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false;
 
-    // /api/projects (no /open) returns ALL projects — same source as the
-    // sidebar so the two views stay in sync, including closed projects.
-    fetch('/api/projects')
-      .then(r => (r.ok ? r.json() : null))
-      .then((data: ProjectDTO[] | null) => {
-        if (cancelled || !data) return;
-        setProjects(data);
-        saveToStorage(STORAGE_KEYS.PROJECTS, data);
-      })
-      .catch(() => {});
+    // Only fetch projects the logged-in user is a member of, matching the
+    // sidebar. Skip the fetch if there is no session.
+    const currentUser = getFromStorage<{ userId?: number }>(STORAGE_KEYS.USER);
+    if (currentUser?.userId) {
+      fetch(`/api/projects/user/${currentUser.userId}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then((data: ProjectDTO[] | null) => {
+          if (cancelled || !data) return;
+          setProjects(data);
+          saveToStorage(STORAGE_KEYS.PROJECTS, data);
+        })
+        .catch(() => {});
+    }
 
     fetch('/api/project-memberships')
       .then(r => (r.ok ? r.json() : null))
