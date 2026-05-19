@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { KpiCard } from '../Components/Team'; // shared visual primitive — promote to /Common if it spreads further
 import {
+  AddFeatureModal,
   AddTaskModal,
   DeveloperTaskBoard,
   FeatureDetailPanel,
@@ -23,6 +24,7 @@ import type {
   FeatureDetailData,
   FilterKey,
   FilterValues,
+  NewFeatureData,
   NewTaskData,
   PriorityTone,
   TaskBoardMode,
@@ -30,6 +32,7 @@ import type {
 import type { StatusTone } from '../Components/Sprint';
 import TaskDetailModal from '../Components/Common/TaskDetailModal';
 import type { TaskDetailData } from '../Components/Common/TaskDetailModal';
+import ConfirmDeleteModal from '../Components/Common/ConfirmDeleteModal';
 import PageLoading from '../Components/Common/PageLoading';
 import ProgressBar from '../Components/Common/ProgressBar';
 import Sparkline from '../Components/Common/Sparkline';
@@ -50,7 +53,7 @@ import {
 } from '../Utils/types';
 import { mapTaskPriority, normalizeTaskState, formatDate } from '../Utils/helpers';
 import { MOCK_SPRINT_BASE } from '../Utils/mockData';
-import { SprintTaskJoined, ComputedKpis, computeSprintKpis } from '../Utils/kpiUtils';
+import { SprintTaskJoined, ComputedKpis, computeSprintKpis, taskWeight } from '../Utils/kpiUtils';
 
 
 
@@ -193,6 +196,15 @@ export default function SprintPage() {
   // When non-null, the AddTaskModal opens in edit mode preloaded with this
   // task's values. Mutually exclusive with showAddTaskModal in practice.
   const [taskToEdit, setTaskToEdit] = useState<SprintTaskJoined | null>(null);
+
+  // Add-Feature modal — same refresh pattern as tasks, but tied to features
+  // (they're loaded on the same effect, so we can reuse taskRefreshToken).
+  const [showAddFeatureModal, setShowAddFeatureModal] = useState(false);
+
+  // Delete confirmation state — at most one of these is non-null at a time.
+  // Holds the raw entity so the confirm message can render its name.
+  const [taskToDelete, setTaskToDelete] = useState<SprintTaskJoined | null>(null);
+  const [featureToDelete, setFeatureToDelete] = useState<FeatureDTO | null>(null);
 
   // autoCloseSprints setting for the current project — if false, show manual
   // "Terminar Sprint" button on active sprints.
@@ -345,7 +357,9 @@ export default function SprintPage() {
       const total = tasksOfFeature.length;
       const completed = tasksOfFeature.filter(t => t.stateTask === 'done').length;
       const sps = tasksOfFeature.reduce((sum, t) => sum + (t.storyPoints ?? 0), 0);
-      const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+      const totalW     = tasksOfFeature.reduce((sum, t) => sum + taskWeight(t), 0);
+      const completedW = tasksOfFeature.filter(t => t.stateTask === 'done').reduce((sum, t) => sum + taskWeight(t), 0);
+      const progress = totalW === 0 ? 0 : Math.round((completedW / totalW) * 100);
       const status = statusFromProgress(progress);
 
       // Developer attribution: pick the most common owner. If multiple,
@@ -661,7 +675,7 @@ export default function SprintPage() {
         dateStartTask:   taskToEdit.dateStartTask,
         dateEndSetTask:  data.dateEndSetTask ?? null,
         dateEndRealTask: taskToEdit.dateEndRealTask,
-        featureId:       taskToEdit.featureId ?? null,
+        featureId:       data.featureId ?? null,
       };
       const putRes = await fetch(`/api/tasks/${taskToEdit.taskId}`, {
         method: 'PUT',
@@ -687,6 +701,7 @@ export default function SprintPage() {
       pjId:           projectId,
       dateStartTask:  todayIso,
       dateEndSetTask: data.dateEndSetTask ?? null,
+      featureId:      data.featureId ?? null,
     };
     const createRes = await fetch('/api/tasks', {
       method: 'POST',
@@ -697,12 +712,14 @@ export default function SprintPage() {
       throw new Error(`POST /api/tasks → ${createRes.status}`);
     }
 
-    // The controller returns the new taskId in the `location` header it
-    // explicitly exposes via Access-Control-Expose-Headers.
-    const newTaskIdHeader = createRes.headers.get('location');
-    const newTaskId = newTaskIdHeader ? Number(newTaskIdHeader) : NaN;
+    // The controller returns the saved entity in the response body. We
+    // previously read the `Location` header but post-refactor it became a
+    // full URI ("http://.../api/tasks/123") which Number() can't parse, so
+    // reading the body is both simpler and more robust.
+    const created = await createRes.json().catch(() => null);
+    const newTaskId = created && typeof created.taskId === 'number' ? created.taskId : NaN;
     if (!Number.isFinite(newTaskId) || newTaskId <= 0) {
-      throw new Error('Backend did not return a taskId in the location header');
+      throw new Error('Backend did not return a usable taskId in the response body');
     }
 
     // 2) Link the new task to this sprint. The backend defaults stateTask
@@ -729,6 +746,90 @@ export default function SprintPage() {
     setSelectedTaskForModal(null);
   };
 
+  /**
+   * Creates a feature inside the current sprint. Features can be empty —
+   * tasks reference them later via TASK_TT.feature_id. Bumps the refresh
+   * token so the features list reloads.
+   */
+  const handleCreateFeature = async (data: NewFeatureData): Promise<void> => {
+    if (sprintId == null) throw new Error('Missing sprintId');
+
+    const body = {
+      nameFeature:        data.nameFeature,
+      priorityFeature:    data.priorityFeature,
+      descriptionFeature: data.descriptionFeature ?? null,
+      sprId:              sprintId,
+    };
+    const res = await fetch('/api/features', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(`POST /api/features → ${res.status}`);
+    }
+    setTaskRefreshToken(t => t + 1);
+  };
+
+  /**
+   * Triggered when the user clicks "Delete" in the TaskDetailModal. Captures
+   * the raw task DTO so the confirmation modal can show the task name.
+   */
+  const handleAskDeleteTask = () => {
+    if (!selectedTaskForModal) return;
+    const raw = sprintTasks.find(t => t.taskId === selectedTaskForModal.id);
+    if (!raw) return;
+    setTaskToDelete(raw);
+    setSelectedTaskForModal(null);
+  };
+
+  /**
+   * Performs the actual DELETE for a task. The ON DELETE CASCADE on
+   * SPRINT_TASK_TT removes the link row automatically.
+   */
+  const handleConfirmDeleteTask = async (): Promise<void> => {
+    if (!taskToDelete) return;
+    const res = await fetch(`/api/tasks/${taskToDelete.taskId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      throw new Error(`DELETE /api/tasks/${taskToDelete.taskId} → ${res.status}`);
+    }
+    setTaskToDelete(null);
+    setTaskRefreshToken(t => t + 1);
+  };
+
+  /**
+   * Triggered by the "Delete Feature" button inside FeatureDetailPanel.
+   * Captures the FeatureDTO from rawFeatures by id.
+   */
+  const handleAskDeleteFeature = (featureId: number) => {
+    const raw = rawFeatures.find(f => f.featureId === featureId);
+    if (!raw) return;
+    setFeatureToDelete(raw);
+  };
+
+  /**
+   * Performs the actual DELETE for a feature. ON DELETE SET NULL on
+   * TASK_TT.feature_id means tasks are preserved but lose their grouping.
+   */
+  const handleConfirmDeleteFeature = async (): Promise<void> => {
+    if (!featureToDelete) return;
+    const res = await fetch(`/api/features/${featureToDelete.featureId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      throw new Error(`DELETE /api/features/${featureToDelete.featureId} → ${res.status}`);
+    }
+    // Drop selection if it pointed at the feature we just removed so the
+    // detail panel doesn't try to render a ghost.
+    if (selectedFeatureId === featureToDelete.featureId) {
+      setSelectedFeatureId(null);
+    }
+    setFeatureToDelete(null);
+    setTaskRefreshToken(t => t + 1);
+  };
+
   return (
     <div className="bg-gray-50 min-h-full px-6 py-8">
       <TaskDetailModal
@@ -736,6 +837,25 @@ export default function SprintPage() {
         onClose={() => setSelectedTaskForModal(null)}
         task={selectedTaskForModal}
         onEdit={handleStartEdit}
+        onDelete={handleAskDeleteTask}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={taskToDelete !== null}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={handleConfirmDeleteTask}
+        title="Delete Task"
+        message="This will permanently delete the task and remove it from its sprint."
+        itemName={taskToDelete?.nameTask ?? undefined}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={featureToDelete !== null}
+        onClose={() => setFeatureToDelete(null)}
+        onConfirm={handleConfirmDeleteFeature}
+        title="Delete Feature"
+        message="This will permanently delete the feature. Tasks in this feature will be kept but lose their feature label."
+        itemName={featureToDelete?.nameFeature ?? undefined}
       />
 
       {projectId != null && (
@@ -747,10 +867,20 @@ export default function SprintPage() {
           }}
           projectId={projectId}
           usersById={usersById}
+          features={rawFeatures.map(f => ({
+            featureId: f.featureId,
+            nameFeature: f.nameFeature,
+          }))}
           onCreate={handleSubmitTask}
           initialTask={taskToEdit}
         />
       )}
+
+      <AddFeatureModal
+        isOpen={showAddFeatureModal}
+        onClose={() => setShowAddFeatureModal(false)}
+        onCreate={handleCreateFeature}
+      />
 
       {isPageLoading ? (
         <div className="max-w-7xl mx-auto">
@@ -929,6 +1059,19 @@ export default function SprintPage() {
                 Add Task
               </button>
             )}
+
+            {contentView === 'features' && sprintId != null && (
+              <button
+                type="button"
+                onClick={() => setShowAddFeatureModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
+                           text-white bg-brand hover:bg-brand-dark rounded-lg shadow-sm
+                           transition-colors"
+              >
+                <span aria-hidden="true" className="text-base leading-none">+</span>
+                Add Feature
+              </button>
+            )}
           </div>
 
           {contentView === 'features' ? (
@@ -976,7 +1119,7 @@ export default function SprintPage() {
 
                 {/* Right: feature detail (only when something is selected). */}
                 {detail ? (
-                  <FeatureDetailPanel feature={detail} onTaskClick={handleTaskClick} />
+                  <FeatureDetailPanel feature={detail} onTaskClick={handleTaskClick} onDelete={handleAskDeleteFeature} />
                 ) : (
                   <p className="text-sm text-gray-400 self-center text-center">
                     Select a feature to view details.

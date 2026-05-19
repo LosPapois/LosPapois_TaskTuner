@@ -3,11 +3,8 @@ package com.springboot.MyTodoList.controller;
 import com.springboot.MyTodoList.model.FeatureTT;
 import com.springboot.MyTodoList.service.FeatureTTService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-import java.net.URI;
 
 import java.util.List;
 
@@ -25,9 +22,7 @@ public class FeatureTTController {
 
     @GetMapping("/features/{id}")
     public ResponseEntity<FeatureTT> getFeatureById(@PathVariable long id) {
-        return featureTTService.getFeatureById(id)
-                .map(feature -> new ResponseEntity<>(feature, HttpStatus.OK))
-                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+        return ControllerHelper.okOrNotFound(featureTTService.getFeatureById(id));
     }
 
     @GetMapping("/features/sprint/{sprId}")
@@ -43,25 +38,16 @@ public class FeatureTTController {
     @PostMapping("/features")
     public ResponseEntity<FeatureTT> addFeature(@RequestBody FeatureTT feature) {
         FeatureTT saved = featureTTService.addFeature(feature);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}")
-                .buildAndExpand(saved.getFeatureId())
-                .toUri();
-        return ResponseEntity.created(location)
-                .header("Access-Control-Expose-Headers", "Location")
-                .body(saved);
+        return ControllerHelper.created(saved, saved.getFeatureId());
     }
 
     @PutMapping("/features/{id}")
     public ResponseEntity<FeatureTT> updateFeature(@RequestBody FeatureTT feature, @PathVariable long id) {
-        FeatureTT updated = featureTTService.updateFeature(id, feature);
-        if (updated == null) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        return new ResponseEntity<>(updated, HttpStatus.OK);
+        return ControllerHelper.okOrNotFound(featureTTService.updateFeature(id, feature));
     }
 
     @DeleteMapping("/features/{id}")
     public ResponseEntity<Boolean> deleteFeature(@PathVariable long id) {
-        boolean deleted = featureTTService.deleteFeature(id);
-        return new ResponseEntity<>(deleted, deleted ? HttpStatus.OK : HttpStatus.NOT_FOUND);
+        return ControllerHelper.deleted(featureTTService.deleteFeature(id));
     }
 }
