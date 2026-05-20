@@ -282,9 +282,7 @@ function Sidebar({ isOpen }: SidebarProps) {
           <button
             type="button"
             onClick={handleOpenAddProject}
-            className="flex items-center justify-center gap-2 w-full mb-3 px-3 py-2.5 rounded-lg
-                       text-sm font-semibold text-white bg-brand hover:bg-brand-dark
-                       transition-colors text-left"
+            className="btn-primary w-full flex items-center justify-center gap-2 mb-3"
           >
             <PlusIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
             <span className="truncate">Add Project</span>
