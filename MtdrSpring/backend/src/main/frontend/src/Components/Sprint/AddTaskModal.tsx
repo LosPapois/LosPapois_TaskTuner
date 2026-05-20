@@ -6,10 +6,9 @@ export interface NewTaskData {
   nameTask: string;
   infoTask?: string;
   priority: NewTaskPriority;
-  storyPoints?: number;
+  /** Required — the modal validates this is filled before submitting. */
+  storyPoints: number;
   userId: number;
-  /** ISO date (yyyy-mm-dd) from <input type="date">, optional. */
-  dateEndSetTask?: string;
   /** Optional feature to group this task under. */
   featureId?: number | null;
 }
@@ -31,7 +30,6 @@ export interface InitialTaskValues {
   priority?: string | null;
   storyPoints?: number | null;
   userId?: number | null;
-  dateEndSetTask?: string | null;
   featureId?: number | null;
 }
 
@@ -77,7 +75,6 @@ const EMPTY_FORM = {
   priority: 'medium' as NewTaskPriority,
   storyPoints: '',
   userId: '' as number | '',
-  dateEndSetTask: '',
   // '' = "(No feature)" — sentinel that lets the dropdown stay controlled
   // while still expressing "leave the FK null".
   featureId: '' as number | '',
@@ -122,9 +119,6 @@ export default function AddTaskModal({
         priority,
         storyPoints:    initialTask.storyPoints != null ? String(initialTask.storyPoints) : '',
         userId:         initialTask.userId ?? '',
-        // Backend may send full ISO ('2026-05-12T00:00:00') — slice to yyyy-mm-dd
-        // so <input type="date"> accepts it.
-        dateEndSetTask: initialTask.dateEndSetTask ? initialTask.dateEndSetTask.slice(0, 10) : '',
         featureId:      initialTask.featureId ?? '',
       });
     } else {
@@ -179,14 +173,13 @@ export default function AddTaskModal({
       return setError('Pick an assignee.');
     }
 
-    // Parse story points only if provided — empty means "no estimate yet".
-    let storyPoints: number | undefined;
-    if (form.storyPoints !== '') {
-      const n = Number(form.storyPoints);
-      if (!Number.isFinite(n) || n < 0) {
-        return setError('Story points must be a non-negative number.');
-      }
-      storyPoints = n;
+    // Story points are required.
+    if (form.storyPoints === '') {
+      return setError('Story points are required.');
+    }
+    const storyPoints = Number(form.storyPoints);
+    if (!Number.isFinite(storyPoints) || storyPoints < 0) {
+      return setError('Story points must be a non-negative number.');
     }
 
     setError(null);
@@ -198,7 +191,6 @@ export default function AddTaskModal({
         priority: form.priority,
         storyPoints,
         userId: Number(form.userId),
-        dateEndSetTask: form.dateEndSetTask || undefined,
         // null = "no feature" (sentinel empty string) → unset the FK.
         featureId: form.featureId === '' ? null : Number(form.featureId),
       });
@@ -288,7 +280,7 @@ export default function AddTaskModal({
 
             <div>
               <label htmlFor="task-sp" className="block text-sm font-semibold text-gray-800 mb-2">
-                Story Points <span className="text-gray-400 font-normal">(optional)</span>
+                Story Points
               </label>
               <input
                 id="task-sp"
@@ -357,21 +349,8 @@ export default function AddTaskModal({
             </select>
           </div>
 
-          <div>
-            <label htmlFor="task-due" className="block text-sm font-semibold text-gray-800 mb-2">
-              Due Date <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <input
-              id="task-due"
-              type="date"
-              value={form.dateEndSetTask}
-              onChange={e => setForm(p => ({ ...p, dateEndSetTask: e.target.value }))}
-              disabled={submitting}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-700
-                         focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand
-                         transition-colors disabled:opacity-60"
-            />
-          </div>
+          {/* Due date is intentionally not asked here — the task inherits */}
+          {/* the sprint's end date automatically (set by the parent page). */}
 
           {error && (
             <p
