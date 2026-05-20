@@ -14,7 +14,7 @@ export default function LoginPage(): JSX.Element {
   }
 
   return (
-    <main className="center-h-screen bg-white px-4 py-40">
+    <main className="auth-page-background flex min-h-screen items-center justify-center overflow-hidden px-4 py-20">
       <div className="mx-auto flex w-full max-w-md flex-col items-center">
         <div className="w-full">
           <AuthBrandHeader />
