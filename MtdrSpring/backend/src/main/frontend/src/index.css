@@ -1,6 +1,12 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* * Tailwind Import Directives
+ * Using standard PostCSS-compliant structure to let Tailwind inject 
+ * globals.css at the exact moment components are loaded.
+ */
+@import "./globals.css";
+
+/* ========================================
+   BASE & LAYOUT OVERRIDES
+   ======================================== */
 
 body {
   background-color: #ffffff;
@@ -11,31 +17,25 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #004D40;
+  @apply text-brand-dark;
 }
 
 a {
-  color: #009B77;
-}
-a:hover {
-  color: #004D40;
+  @apply text-brand hover:text-brand-dark transition-colors duration-200;
 }
 
+/* ========================================
+   LEGACY COMPATIBILITY (refactor in components)
+   ======================================== */
+
 .App {
-  background: #ffffff;
-  color: #004D40;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  @apply flex flex-col items-center bg-white text-brand-dark rounded-lg;
   font-size: max(14px, min(2vw, 20px));
   margin: 2rem auto 4rem auto;
   padding: 2rem 3rem;
   position: relative;
   box-shadow: 0 10px 18px 0 rgba(0, 155, 119, 0.08), 0 4.5rem 8rem 0 rgba(0, 155, 119, 0.04);
-  border: 1px solid #B2DFDB;
-  border-radius: 0.5rem;
-  max-width: 1200px;
-  width: 90%;
+  @apply border border-brand-200 max-w-5xl w-96;
 }
 
 div#maincontent,
@@ -44,96 +44,66 @@ div#newinputform form {
 }
 
 div#maincontent {
-  margin: 0;
-  padding: 0;
+  @apply m-0 p-0;
 }
 
 h1, h2 {
-  color: #004D40;
-}
-
-h1 {
-  margin: 0.5rem 0 1.5rem 0;
-  padding: 0;
-  font-size: 2rem;
-}
-
-h2 {
-  margin: 0.5rem 0 0.5rem 0;
-  padding: 0;
-  border-bottom: 2px solid #B2DFDB;
-  padding-bottom: 0.4rem;
-  font-size: 1.4rem;
+  @apply text-brand-dark;
 }
 
 #newiteminput {
-  width: 100%;
-  border: 1px solid #B2DFDB;
-  border-radius: 0.3rem;
-  padding: 12px 14px;
-  font-size: 1rem;
+  @apply w-full border-brand-200 rounded-lg border-2;
 }
 
 #newiteminput:focus {
-  outline: none;
-  border-color: #009B77;
-  box-shadow: 0 0 0 2px rgba(0, 155, 119, 0.2);
+  @apply outline-none border-brand ring-2 ring-brand-100;
 }
 
 div#newinputform {
-  width: 100%;
+  @apply w-full;
 }
 
 div#newinputform form {
-  display: flex;
-  flex-direction: row;
-  margin: 0 auto;
+  @apply flex flex-row w-full mx-auto;
 }
 
 #donelist {
-  margin: 0;
-  padding: 0;
+  @apply m-0 p-0;
 }
 
 table#itemlistNotDone {
-  margin-bottom: 2rem;
+  @apply mb-8;
 }
 
 table#itemlistDone {
-  margin-bottom: 3rem;
+  @apply mb-12;
 }
 
 table.itemlist {
-  margin-top: 0.7rem;
-  border-collapse: collapse;
-  margin-bottom: 1rem;
-  width: 100%;
+  @apply w-full mt-0.5 border-collapse mb-4;
 }
 
 table.itemlist td {
-  border-bottom: solid 1px #B2DFDB;
-  padding: 0.8rem 0.5rem;
-  color: #004D40;
+  @apply border-b border-brand-200 px-2 py-3 text-brand-dark;
   font-size: 1rem;
 }
 
 table.itemlist td.description {
-  width: 100%;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  @apply w-full px-4;
 }
 
 table.itemlist td.date {
   font-size: max(10px, min(1.5vw, 14px));
-  color: #00796B;
-  white-space: nowrap;
-  padding-right: 0;
-  padding-left: 0;
+  @apply text-secondary whitespace-nowrap px-0;
 }
 
 table.itemlist tr:hover {
-  background-color: #E0F7FA;
+  @apply bg-brand-50;
 }
+
+/* ========================================
+   FORM ELEMENTS
+   ======================================== */
 
 input {
   font-family: inherit;
@@ -147,40 +117,15 @@ input {
   overflow: visible;
 }
 
-button.AddButton,
-button.DeleteButton,
-button.DoneButton {
-  font-size: max(11px, min(2vw, 14px)) !important;
-  padding: 0.5em 1em !important;
-  font-weight: bold;
-  border-radius: 0.25rem !important;
-  transition: all 0.2s;
-}
-
+/* Legacy button styles - migrate to btn-* classes in components */
 button.AddButton {
-  color: #ffffff !important;
-  background-color: #009B77 !important;
-}
-
-button.AddButton:hover {
-  background-color: #004D40 !important;
+  @apply inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 font-semibold text-white shadow-md hover:bg-brand-dark transition-all;
 }
 
 button.DeleteButton {
-  color: #ffffff !important;
-  background-color: #004D40 !important;
-}
-
-button.DeleteButton:hover {
-  background-color: #004D00 !important;
+  @apply inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 font-semibold text-white shadow-md hover:bg-red-700 transition-all;
 }
 
 button.DoneButton {
-  color: #009B77 !important;
-  background-color: #ffffff !important;
-  border: 1px solid #009B77 !important;
-}
-
-button.DoneButton:hover {
-  background-color: #E0F7FA !important;
+  @apply inline-flex items-center gap-2 rounded-xl border-2 border-brand bg-white px-4 py-2.5 font-semibold text-brand transition-all hover:bg-brand-50;
 }

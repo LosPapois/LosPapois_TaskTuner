@@ -90,7 +90,7 @@ export default function AddProjectModal({
       >
         <h2
           id="add-project-title"
-          className="text-xl font-bold text-gray-900 mb-5"
+          className="heading-page!"
         >
           Add New Project
         </h2>
@@ -99,7 +99,7 @@ export default function AddProjectModal({
           <div>
             <label
               htmlFor="project-name"
-              className="block text-sm font-semibold text-gray-800 mb-2"
+              className="label-form"
             >
               Project Name
             </label>
@@ -110,17 +110,14 @@ export default function AddProjectModal({
               value={form.name}
               onChange={e => handleChange('name', e.target.value)}
               placeholder="e.g. Mobile App Revamp"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm
-                         placeholder:text-gray-400
-                         focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand
-                         transition-colors"
+              className="input-brand"
             />
           </div>
 
           <div>
             <label
               htmlFor="project-start"
-              className="block text-sm font-semibold text-gray-800 mb-2"
+              className="label-form"
             >
               Start Date
             </label>
@@ -129,17 +126,14 @@ export default function AddProjectModal({
               type="date"
               value={form.startDate}
               onChange={e => handleChange('startDate', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm
-                         text-gray-700
-                         focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand
-                         transition-colors"
+              className="input-brand"
             />
           </div>
 
           <div>
             <label
               htmlFor="project-end"
-              className="block text-sm font-semibold text-gray-800 mb-2"
+              className="label-form"
             >
               End Date
             </label>
@@ -148,10 +142,7 @@ export default function AddProjectModal({
               type="date"
               value={form.endDate}
               onChange={e => handleChange('endDate', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm
-                         text-gray-700
-                         focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand
-                         transition-colors"
+              className="input-brand"
             />
           </div>
 
@@ -169,16 +160,14 @@ export default function AddProjectModal({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 border border-gray-300 text-gray-800 py-3 rounded-xl
-                         font-semibold hover:bg-gray-50 transition-colors disabled:opacity-60"
+              className="flex-1 btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 bg-brand hover:bg-brand-dark text-white py-3 rounded-xl
-                         font-semibold shadow-sm transition-colors disabled:opacity-60"
+              className="flex-1 btn-primary"
             >
               {submitting ? 'Creating...' : 'Create Project'}
             </button>
