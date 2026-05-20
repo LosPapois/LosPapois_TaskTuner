@@ -179,7 +179,7 @@ export default function ArchivedProjectsPage() {
           >
             <ArchiveBoxIcon className="h-7 w-7 text-gray-500" />
           </span>
-          <h1 className="text-4xl font-bold text-gray-900">
+          <h1 className="heading-h1">
             Archived projects
           </h1>
           <p className="text-gray-500 mt-2">

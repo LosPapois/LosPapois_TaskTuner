@@ -15,10 +15,7 @@ function HomeButton() {
       onClick={() => navigate('/home')}
       aria-label="Go to Home"
       title="Home"
-      // Mirrors SidebarToggle: gray icon at rest, brand-tinted on hover.
-      className="inline-flex items-center justify-center rounded-md p-2
-                 text-gray-500 hover:bg-brand-lighter hover:text-brand-dark
-                 transition-colors focus:outline-2 focus:outline-brand-dark"
+      className="btn-icon-light text-gray-500 hover:text-brand-dark"
     >
       <HomeIcon className="size-6" aria-hidden="true" />
     </button>

@@ -979,18 +979,18 @@ export default function SprintPage() {
       />
 
       {isPageLoading ? (
-        <div className="max-w-7xl mx-auto">
+        <div className="container-main">
           <PageLoading
             title="Loading sprint..."
             subtitle="Fetching sprint data, tasks, features, and assignments for the full view."
           />
         </div>
       ) : (
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="container-main space-y-8">
         {/* Header */}
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="heading-h2">
               {projectName} - {sprint.name}
             </h1>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500 mt-2">
@@ -1026,7 +1026,7 @@ export default function SprintPage() {
         {showEndConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
-              <h2 className="text-xl font-bold text-gray-900">Terminar Sprint</h2>
+              <h2 className="heading-h4 before:hidden mb-3">Terminar Sprint</h2>
               <p className="mt-3 text-sm text-gray-500">
                 ¿Seguro que quieres cerrar <span className="font-semibold text-gray-700">{sprint.name}</span>?
                 El siguiente sprint más próximo se activará automáticamente.
@@ -1104,14 +1104,12 @@ export default function SprintPage() {
         {/* Features section */}
         <section
           aria-labelledby="features-heading"
-          className="bg-white border border-gray-200 rounded-xl p-6 space-y-5
-                     shadow-sm shadow-gray-200/60"
+          className="section-card space-y-5"
         >
           <h2
             id="features-heading"
-            className="flex items-center gap-3 text-xl font-bold text-gray-800"
+            className="heading-h4"
           >
-            <span className="h-5 w-1 bg-brand rounded-full" aria-hidden="true" />
             Sprint Status
           </h2>
 

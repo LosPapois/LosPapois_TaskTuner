@@ -170,7 +170,7 @@ export default function HomePage() {
     <div className="bg-gray-50 min-h-full px-6 py-12">
       <div className="max-w-5xl mx-auto">
         <header className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900">
+          <h1 className="heading-h1">
             Select a project
           </h1>
           <p className="text-gray-500 mt-2">

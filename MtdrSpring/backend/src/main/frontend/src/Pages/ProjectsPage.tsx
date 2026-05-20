@@ -106,29 +106,29 @@ function NewProjectModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl shadow-brand-dark/30">
-        <h2 className="text-2xl font-bold text-gray-900">Create New Project</h2>
+    <div className="modal-overlay">
+      <div className="modal-box-lg">
+        <h2 className="heading-h3">Create New Project</h2>
 
         <div className="mt-6 space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-gray-700">Project Name</label>
+            <label className="label-form">Project Name</label>
             <input
               type="text"
               placeholder="E.g.: Management System"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base text-gray-800 placeholder-gray-400 outline-none focus:border-brand focus:ring-2 focus:ring-brand-lighter"
+              className="input-brand"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700">Expected End Date</label>
+            <label className="label-form">Expected End Date</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base text-gray-800 placeholder-gray-400 outline-none focus:border-brand focus:ring-2 focus:ring-brand-lighter"
+              className="input-brand"
             />
           </div>
 
@@ -161,14 +161,14 @@ function NewProjectModal({
           <button
             onClick={onClose}
             disabled={submitting}
-            className="flex-1 rounded-xl border border-gray-200 bg-white py-3 text-base font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 btn-secondary"
           >
             Cancel
           </button>
           <button
             onClick={handleCreate}
             disabled={submitting || !projectName.trim()}
-            className="flex-1 rounded-xl bg-brand py-3 text-base font-semibold text-white shadow-md shadow-brand/25 hover:bg-brand-dark disabled:opacity-50"
+            className="flex-1 btn-primary"
           >
             {submitting ? 'Creating…' : 'Create Project'}
           </button>
@@ -206,18 +206,18 @@ function EditProjectModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl shadow-brand-dark/30">
-        <h2 className="text-2xl font-bold text-gray-900">Project Settings</h2>
+    <div className="modal-overlay">
+      <div className="modal-box-lg">
+        <h2 className="heading-h3">Project Settings</h2>
 
         <div className="mt-6 space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-gray-700">Project Name</label>
+            <label className="label-form">Project Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base text-gray-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand-lighter"
+              className="input-brand"
             />
           </div>
 
@@ -274,7 +274,7 @@ function EditProjectModal({
           <button
             onClick={onClose}
             disabled={submitting}
-            className="flex-1 rounded-xl border border-gray-200 bg-white py-3 text-base font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 btn-secondary"
           >
             Cancel
           </button>
@@ -321,7 +321,7 @@ function NewSprintModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl shadow-brand-dark/30">
-        <h2 className="text-2xl font-bold text-gray-900">Start New Sprint</h2>
+        <h2 className="heading-h3">Start New Sprint</h2>
 
         <p className="mt-3 text-base text-gray-500">
           {currentSprint
@@ -640,7 +640,7 @@ export default function ProjectsPage() {
 
         <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-6 py-5 shadow-lg shadow-brand/10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="heading-h3">
               {currentSprint ? currentSprint.name : 'No active sprint'}
             </h2>
             <div className="mt-2 flex items-center gap-6 text-sm text-gray-500">
