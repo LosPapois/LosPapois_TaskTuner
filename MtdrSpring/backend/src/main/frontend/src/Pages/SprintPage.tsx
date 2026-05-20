@@ -6,6 +6,7 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ExclamationCircleIcon,
+  InboxIcon,
   StopIcon,
 } from '@heroicons/react/24/outline';
 import { KpiCard } from '../Components/Team'; // shared visual primitive — promote to /Common if it spreads further
@@ -136,6 +137,10 @@ interface SprintUiPreferences {
 
 const sprintUiPrefsKey = (sid: number) => `${STORAGE_KEYS.CURRENT_SPRINT}_ui_${sid}`;
 
+// Synthetic id for the "No Feature" grouping. Real feature ids are positive,
+// so -1 never collides with a backend feature.
+const NO_FEATURE_ID = -1;
+
 // MockFeature stays as the page's internal display shape — the enrich step
 // builds objects with this same structure so the existing list/detail
 // components don't need any changes. The MOCK_FEATURES seed data was
@@ -200,6 +205,9 @@ export default function SprintPage() {
   // Add-Feature modal — same refresh pattern as tasks, but tied to features
   // (they're loaded on the same effect, so we can reuse taskRefreshToken).
   const [showAddFeatureModal, setShowAddFeatureModal] = useState(false);
+  // When non-null, AddFeatureModal opens in edit mode with this feature's
+  // values. Mutually exclusive with showAddFeatureModal in practice.
+  const [featureToEdit, setFeatureToEdit] = useState<FeatureDTO | null>(null);
 
   // Delete confirmation state — at most one of these is non-null at a time.
   // Holds the raw entity so the confirm message can render its name.
@@ -390,6 +398,38 @@ export default function SprintPage() {
       };
     });
   }, [rawFeatures, sprintTasks, usersById]);
+
+  // Synthetic "No Feature" group — collects the sprint's tasks that aren't
+  // linked to any feature. null when every task has a feature, so we never
+  // render an empty bucket. Kept separate from displayFeatures so it doesn't
+  // pollute the feature filters.
+  const unassignedGroup = useMemo<MockFeature | null>(() => {
+    const looseTasks = sprintTasks.filter(t => t.featureId == null);
+    if (looseTasks.length === 0) return null;
+
+    const total = looseTasks.length;
+    const completed = looseTasks.filter(t => t.stateTask === 'done').length;
+    const sps = looseTasks.reduce((sum, t) => sum + (t.storyPoints ?? 0), 0);
+    const totalW     = looseTasks.reduce((sum, t) => sum + taskWeight(t), 0);
+    const completedW = looseTasks.filter(t => t.stateTask === 'done').reduce((sum, t) => sum + taskWeight(t), 0);
+    const progress = totalW === 0 ? 0 : Math.round((completedW / totalW) * 100);
+    const status = statusFromProgress(progress);
+
+    return {
+      id: NO_FEATURE_ID,
+      name: 'No Feature',
+      developer: '—',
+      storyPoints: sps,
+      completedTasks: completed,
+      totalTasks: total,
+      statusLabel: status.label,
+      statusTone:  status.tone,
+      description: 'Tasks not assigned to any feature.',
+      priority:     '—',
+      priorityTone: 'neutral',
+      progress,
+    };
+  }, [sprintTasks]);
 
   // Merge real backend data over the mock base. The page still renders
   // sensibly while fetches are pending or if they fail.
@@ -598,8 +638,15 @@ export default function SprintPage() {
 
   // Keep selection valid as the list changes — auto-pick first visible
   // when current selection drops out of the filtered set.
+  // Resolve the selected entry. When the "No Feature" group is selected we
+  // return it directly; otherwise fall back through real features.
   const selectedFeature: MockFeature | null =
-    visibleFeatures.find(f => f.id === selectedFeatureId) ?? visibleFeatures[0] ?? null;
+    selectedFeatureId === NO_FEATURE_ID && unassignedGroup
+      ? unassignedGroup
+      : visibleFeatures.find(f => f.id === selectedFeatureId)
+        ?? visibleFeatures[0]
+        ?? unassignedGroup
+        ?? null;
 
   // Build the panel payload only when there's actually a selected feature.
   // Tasks list comes straight from the joined sprintTasks filtered by feature.
@@ -616,7 +663,10 @@ export default function SprintPage() {
         completedTasks: selectedFeature.completedTasks,
         totalTasks:     selectedFeature.totalTasks,
         tasks: sprintTasks
-          .filter(t => t.featureId === selectedFeature.id)
+          // "No Feature" group → tasks with no featureId; otherwise match the id.
+          .filter(t => selectedFeature.id === NO_FEATURE_ID
+            ? t.featureId == null
+            : t.featureId === selectedFeature.id)
           .map(t => ({
             id: t.taskId,
             name: t.nameTask ?? `Task #${t.taskId}`,
@@ -673,7 +723,9 @@ export default function SprintPage() {
         userId:          data.userId,
         pjId:            projectId,
         dateStartTask:   taskToEdit.dateStartTask,
-        dateEndSetTask:  data.dateEndSetTask ?? null,
+        // Due date is always the sprint's end date — the modal no longer
+        // asks for it, so we keep every task aligned to its sprint window.
+        dateEndSetTask:  sprintDto?.dateEndSpr ?? null,
         dateEndRealTask: taskToEdit.dateEndRealTask,
         featureId:       data.featureId ?? null,
       };
@@ -700,7 +752,9 @@ export default function SprintPage() {
       userId:         data.userId,
       pjId:           projectId,
       dateStartTask:  todayIso,
-      dateEndSetTask: data.dateEndSetTask ?? null,
+      // Due date is auto-assigned from the sprint's end date instead of
+      // being asked in the modal.
+      dateEndSetTask: sprintDto?.dateEndSpr ?? null,
       featureId:      data.featureId ?? null,
     };
     const createRes = await fetch('/api/tasks', {
@@ -751,9 +805,37 @@ export default function SprintPage() {
    * tasks reference them later via TASK_TT.feature_id. Bumps the refresh
    * token so the features list reloads.
    */
-  const handleCreateFeature = async (data: NewFeatureData): Promise<void> => {
+  /**
+   * Handles both create and edit submissions from AddFeatureModal.
+   *
+   * Create: POST /api/features
+   * Edit:   PUT  /api/features/{id}  (sprint link preserved)
+   */
+  const handleSubmitFeature = async (data: NewFeatureData): Promise<void> => {
     if (sprintId == null) throw new Error('Missing sprintId');
 
+    // ── EDIT ──────────────────────────────────────────────────────────
+    if (featureToEdit) {
+      const putBody = {
+        featureId:          featureToEdit.featureId,
+        nameFeature:        data.nameFeature,
+        priorityFeature:    data.priorityFeature,
+        descriptionFeature: data.descriptionFeature ?? null,
+        sprId:              featureToEdit.sprId,
+      };
+      const res = await fetch(`/api/features/${featureToEdit.featureId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(putBody),
+      });
+      if (!res.ok) {
+        throw new Error(`PUT /api/features/${featureToEdit.featureId} → ${res.status}`);
+      }
+      setTaskRefreshToken(t => t + 1);
+      return;
+    }
+
+    // ── CREATE ────────────────────────────────────────────────────────
     const body = {
       nameFeature:        data.nameFeature,
       priorityFeature:    data.priorityFeature,
@@ -769,6 +851,16 @@ export default function SprintPage() {
       throw new Error(`POST /api/features → ${res.status}`);
     }
     setTaskRefreshToken(t => t + 1);
+  };
+
+  /**
+   * Triggered by the "Edit Feature" button inside FeatureDetailPanel.
+   * Captures the raw FeatureDTO so the modal can prefill its fields.
+   */
+  const handleStartEditFeature = (featureId: number) => {
+    const raw = rawFeatures.find(f => f.featureId === featureId);
+    if (!raw) return;
+    setFeatureToEdit(raw);
   };
 
   /**
@@ -877,9 +969,13 @@ export default function SprintPage() {
       )}
 
       <AddFeatureModal
-        isOpen={showAddFeatureModal}
-        onClose={() => setShowAddFeatureModal(false)}
-        onCreate={handleCreateFeature}
+        isOpen={showAddFeatureModal || featureToEdit !== null}
+        onClose={() => {
+          setShowAddFeatureModal(false);
+          setFeatureToEdit(null);
+        }}
+        onCreate={handleSubmitFeature}
+        initialFeature={featureToEdit}
       />
 
       {isPageLoading ? (
@@ -1089,35 +1185,76 @@ export default function SprintPage() {
                   <h3 className="text-base font-semibold text-gray-800 mb-3">
                     Features ({visibleFeatures.length})
                   </h3>
-                  {visibleFeatures.length === 0 ? (
+                  {visibleFeatures.length === 0 && !unassignedGroup ? (
                     <p className="text-sm text-gray-400">
                       {displayFeatures.length === 0
                         ? 'This sprint has no features yet.'
                         : 'No features match the current filters.'}
                     </p>
                   ) : (
-                    <div className="space-y-2">
-                      {visibleFeatures.map(f => (
-                        <FeatureListItem
-                          key={f.id}
-                          name={f.name}
-                          developer={f.developer}
-                          storyPoints={f.storyPoints}
-                          completedTasks={f.completedTasks}
-                          totalTasks={f.totalTasks}
-                          statusLabel={f.statusLabel}
-                          statusTone={f.statusTone}
-                          selected={selectedFeature?.id === f.id}
-                          onSelect={() => setSelectedFeatureId(f.id)}
-                        />
-                      ))}
-                    </div>
+                    <>
+                      {visibleFeatures.length > 0 && (
+                        <div className="space-y-2">
+                          {visibleFeatures.map(f => (
+                            <FeatureListItem
+                              key={f.id}
+                              name={f.name}
+                              developer={f.developer}
+                              storyPoints={f.storyPoints}
+                              completedTasks={f.completedTasks}
+                              totalTasks={f.totalTasks}
+                              statusLabel={f.statusLabel}
+                              statusTone={f.statusTone}
+                              selected={selectedFeature?.id === f.id}
+                              onSelect={() => setSelectedFeatureId(f.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* "No Feature" group — deliberately styled differently */}
+                      {/* (dashed border, muted gray, icon, divider above) so it */}
+                      {/* never reads as a real feature card. */}
+                      {unassignedGroup && (
+                        <div className={visibleFeatures.length > 0 ? 'mt-4 pt-4 border-t border-dashed border-gray-300' : ''}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedFeatureId(NO_FEATURE_ID)}
+                            aria-pressed={selectedFeature?.id === NO_FEATURE_ID}
+                            className={`w-full p-3 rounded-xl border border-dashed text-left transition-colors
+                              ${
+                                selectedFeature?.id === NO_FEATURE_ID
+                                  ? 'border-gray-400 bg-gray-100'
+                                  : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                              }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <InboxIcon className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
+                              <span className="text-sm font-semibold text-gray-600">No Feature</span>
+                              <span className="ml-auto text-xs text-gray-400">
+                                {unassignedGroup.totalTasks} tasks
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1 ml-6">
+                              Tasks not assigned to any feature
+                            </p>
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
                 {/* Right: feature detail (only when something is selected). */}
                 {detail ? (
-                  <FeatureDetailPanel feature={detail} onTaskClick={handleTaskClick} onDelete={handleAskDeleteFeature} />
+                  <FeatureDetailPanel
+                    feature={detail}
+                    onTaskClick={handleTaskClick}
+                    /* The synthetic "No Feature" group isn't a real feature, */
+                    /* so it can't be edited or deleted. */
+                    onEdit={detail.id === NO_FEATURE_ID ? undefined : handleStartEditFeature}
+                    onDelete={detail.id === NO_FEATURE_ID ? undefined : handleAskDeleteFeature}
+                  />
                 ) : (
                   <p className="text-sm text-gray-400 self-center text-center">
                     Select a feature to view details.
