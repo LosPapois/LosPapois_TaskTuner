@@ -248,9 +248,14 @@ class BotActionsTest {
         authenticate(user);
         actions("/todolist").fnListAll();
 
-        assertTrue(sentMessages().stream().anyMatch(msg -> msg.getText().contains("My Tasks — Active Sprint")));
-        assertTrue(sentMessages().stream().anyMatch(msg -> msg.getText().contains("Implement login")));
-        assertTrue(sentMessages().stream().anyMatch(msg -> msg.getText().contains("Fix dashboard")));
+        // Header is in message text; task names are in inline keyboard button labels
+        assertTrue(sentMessages().stream().anyMatch(msg -> msg.getText().contains("My Tasks")));
+        assertTrue(sentMessages().stream().anyMatch(msg -> {
+            if (!(msg.getReplyMarkup() instanceof InlineKeyboardMarkup kb)) return false;
+            return kb.getKeyboard().stream().flatMap(List::stream)
+                    .anyMatch(btn -> btn.getText().contains("Implement login"));
+        }));
+        // "Fix dashboard" is a completed task (dateEndRealTask != null) — filtered out of pending list
     }
 
     @Test

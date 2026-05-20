@@ -76,11 +76,11 @@ function Sidebar({ isOpen }: SidebarProps) {
 
   useEffect(() => {
     let cancelled = false;
-    // /api/projects returns ALL projects (active + finalized). We keep the
-    // full list in cache so other pages (HomePage, ArchivedProjectsPage,
-    // StatisticsPage) can read from a single source, then filter for the
-    // sidebar separately to keep the nav focused on active work.
-    fetch('/api/projects')
+    // Only fetch projects the logged-in user is a member of. If there is no
+    // session yet we skip the fetch and let the empty state render.
+    const currentUser = getFromStorage<SessionUser>(STORAGE_KEYS.USER);
+    if (!currentUser?.userId) return;
+    fetch(`/api/projects/user/${currentUser.userId}`)
       .then(res => (res.ok ? res.json() : null))
       .then((data: ProjectDTO[] | null) => {
         if (cancelled || data === null) return; // Allow empty arrays, reject null (network error)

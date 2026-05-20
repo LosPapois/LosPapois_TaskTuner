@@ -11,7 +11,6 @@ public enum BotCommands {
 	ADD_ITEM("/addtask"),
 	STATUS("/status"),
 	MARK_DONE("/done"),
-	MARK_REWORK("/rework"),
 	MARK_UNDO("/undo"),
 	EDIT_TASK("/edittask"),
 	ASK_COMMAND("/ask"),
