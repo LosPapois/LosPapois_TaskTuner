@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --auth-gradient-start: #A5D6A7;
+  --auth-gradient-end: #B2DFDB;
+}
+
+.auth-page-background {
+  background: linear-gradient(135deg, var(--auth-gradient-start) 0%, var(--auth-gradient-end) 100%);
+}
+
 body {
   background-color: #ffffff;
   width: 100%;
