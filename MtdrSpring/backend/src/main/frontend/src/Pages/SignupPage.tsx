@@ -21,7 +21,7 @@ const SignupPage: React.FC = () => {
     };
 
     return (
-        <main className="min-h-screen bg-gray-50 px-4 py-40">
+        <main className="auth-page-background flex min-h-screen items-center justify-center overflow-hidden px-4 py-20">
             <div className="mx-auto flex w-full max-w-md flex-col items-center">
                 <div className="w-full">
                     <AuthBrandHeader />
