@@ -27,6 +27,13 @@ public class ProjectTTController {
         return projectTTService.getOpenProjects();
     }
 
+    // Returns only the projects where the given user is a team member.
+    // The frontend uses this so each user sees their own project list.
+    @GetMapping("/projects/user/{userId}")
+    public List<ProjectTT> getProjectsForUser(@PathVariable long userId) {
+        return projectTTService.getProjectsForUser(userId);
+    }
+
     @GetMapping("/projects/search")
     public List<ProjectTT> searchProjects(@RequestParam String keyword) {
         return projectTTService.searchByName(keyword);

@@ -70,6 +70,14 @@ public class ProjectTTService {
     }
 
     /**
+     * Returns only the projects where the given user is a team member.
+     * Used by the frontend so each user sees their own project list.
+     */
+    public List<ProjectTT> getProjectsForUser(long userId) {
+        return projectTTRepository.findByUserMembership(userId);
+    }
+
+    /**
      * Search projects by name keyword (case-insensitive).
      *
      * @param keyword partial project name to search for

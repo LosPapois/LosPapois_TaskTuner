@@ -100,14 +100,19 @@ export default function ArchivedProjectsPage() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch('/api/projects')
-      .then(r => (r.ok ? r.json() : null))
-      .then((data: ProjectDTO[] | null) => {
-        if (cancelled || !data) return;
-        setAllProjects(data);
-        saveToStorage(STORAGE_KEYS.PROJECTS, data);
-      })
-      .catch(() => {});
+    // Only fetch projects the logged-in user is a member of, then filter
+    // to the archived ones via the existing useMemo above.
+    const currentUser = getFromStorage<{ userId?: number }>(STORAGE_KEYS.USER);
+    if (currentUser?.userId) {
+      fetch(`/api/projects/user/${currentUser.userId}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then((data: ProjectDTO[] | null) => {
+          if (cancelled || !data) return;
+          setAllProjects(data);
+          saveToStorage(STORAGE_KEYS.PROJECTS, data);
+        })
+        .catch(() => {});
+    }
 
     fetch('/api/project-memberships')
       .then(r => (r.ok ? r.json() : null))
@@ -174,7 +179,7 @@ export default function ArchivedProjectsPage() {
           >
             <ArchiveBoxIcon className="h-7 w-7 text-gray-500" />
           </span>
-          <h1 className="text-4xl font-bold text-gray-900">
+          <h1 className="heading-h1">
             Archived projects
           </h1>
           <p className="text-gray-500 mt-2">

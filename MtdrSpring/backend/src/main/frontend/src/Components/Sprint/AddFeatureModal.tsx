@@ -8,11 +8,27 @@ export interface NewFeatureData {
   descriptionFeature?: string;
 }
 
+/**
+ * Subset of FeatureTT used to prefill the form when editing. Pass null/omit
+ * for create mode.
+ */
+export interface InitialFeatureValues {
+  nameFeature?: string | null;
+  priorityFeature?: string | null;
+  descriptionFeature?: string | null;
+}
+
 export interface AddFeatureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called with the validated payload. Parent handles the POST + refresh. */
+  /** Called with the validated payload. Parent handles the POST/PUT + refresh. */
   onCreate: (data: NewFeatureData) => Promise<void> | void;
+  /**
+   * When provided the modal renders in "edit" mode: title becomes "Edit
+   * Feature", the submit button reads "Save Changes", and fields are
+   * prefilled. The parent dispatches PUT vs POST in its onCreate handler.
+   */
+  initialFeature?: InitialFeatureValues | null;
 }
 
 // Oracle CHECK constraint only allows these three — no 'none' for features.
@@ -39,20 +55,34 @@ export default function AddFeatureModal({
   isOpen,
   onClose,
   onCreate,
+  initialFeature,
 }: AddFeatureModalProps) {
+  const isEditMode = initialFeature != null;
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset form + pull focus whenever the modal opens.
+  // Reset form + pull focus whenever the modal opens. In edit mode the form
+  // is seeded from initialFeature instead of EMPTY_FORM.
   useEffect(() => {
     if (!isOpen) return;
-    setForm(EMPTY_FORM);
+    if (initialFeature) {
+      const priority = (['high', 'medium', 'low'].includes(initialFeature.priorityFeature ?? '')
+        ? initialFeature.priorityFeature
+        : 'medium') as NewFeaturePriority;
+      setForm({
+        nameFeature:        initialFeature.nameFeature ?? '',
+        priorityFeature:    priority,
+        descriptionFeature: initialFeature.descriptionFeature ?? '',
+      });
+    } else {
+      setForm(EMPTY_FORM);
+    }
     setError(null);
     const t = setTimeout(() => nameInputRef.current?.focus(), 0);
     return () => clearTimeout(t);
-  }, [isOpen]);
+  }, [isOpen, initialFeature]);
 
   // Escape closes — same pattern as the other modals.
   useEffect(() => {
@@ -103,7 +133,7 @@ export default function AddFeatureModal({
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7 max-h-[90vh] overflow-y-auto"
       >
         <h2 id="add-feature-title" className="text-xl font-bold text-gray-900 mb-5">
-          Add New Feature
+          {isEditMode ? 'Edit Feature' : 'Add New Feature'}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -190,7 +220,9 @@ export default function AddFeatureModal({
               className="flex-1 bg-brand hover:bg-brand-dark text-white py-3 rounded-xl
                          font-semibold shadow-sm transition-colors disabled:opacity-60"
             >
-              {submitting ? 'Creating…' : 'Create Feature'}
+              {submitting
+                ? (isEditMode ? 'Saving…' : 'Creating…')
+                : (isEditMode ? 'Save Changes' : 'Create Feature')}
             </button>
           </div>
         </form>
