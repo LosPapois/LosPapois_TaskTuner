@@ -38,4 +38,11 @@ public enum BotConversationState {
     WAITING_AI_QUESTION,
     // AI creation flow
     WAITING_AI_CREATE_DESCRIPTION,
+    // Bulk import flow (paste text)
+    WAITING_IMPORT_TEXT,
+    WAITING_IMPORT_SPRINT,
+    WAITING_IMPORT_FEATURE,
+    WAITING_IMPORT_CONFIRM,
+    // RAG document upload flow
+    WAITING_DOC_FILE,
 }

@@ -17,75 +17,79 @@ public class SprintTTController {
     @Autowired
     private SprintTTService sprintTTService;
 
-    @GetMapping(value = "/sprints")
+    @GetMapping("/sprints")
     public List<SprintTT> getAllSprints() {
         return sprintTTService.findAll();
     }
 
-    @GetMapping(value = "/sprints/project/{pjId}")
+    @GetMapping("/sprints/project/{pjId}")
     public List<SprintTT> getSprintsByProject(@PathVariable long pjId) {
         return sprintTTService.getSprintsByProject(pjId);
     }
 
-    @GetMapping(value = "/sprints/project/{pjId}/active")
+    @GetMapping("/sprints/project/{pjId}/kpi")
+    public List<SprintTT> getKpiSprintsByProject(@PathVariable long pjId) {
+        return sprintTTService.getActiveAndDoneSprintsByProject(pjId);
+    }
+
+    @GetMapping("/sprints/project/{pjId}/active")
     public ResponseEntity<SprintTT> getActiveSprintForProject(@PathVariable long pjId) {
-        try {
-            return sprintTTService.getActiveSprintForProject(pjId);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        return ControllerHelper.okOrNotFound(sprintTTService.getActiveSprintForProject(pjId));
     }
 
-    @GetMapping(value = "/sprints/{id}/metrics")
+    @GetMapping("/sprints/{id}/metrics")
     public ResponseEntity<SprintMetricsResult> getSprintMetrics(@PathVariable long id) {
-        try {
-            SprintMetricsResult result = sprintTTService.getSprintMetrics(id);
-            return new ResponseEntity<>(result, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        return new ResponseEntity<>(sprintTTService.getSprintMetrics(id), HttpStatus.OK);
     }
 
-    @GetMapping(value = "/sprints/{id}")
+    @GetMapping("/sprints/{id}")
     public ResponseEntity<SprintTT> getSprintById(@PathVariable long id) {
-        try {
-            return sprintTTService.getSprintById(id);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        return ControllerHelper.okOrNotFound(sprintTTService.getSprintById(id));
     }
 
-    @PostMapping(value = "/sprints")
+    @PostMapping("/sprints")
     public ResponseEntity<SprintTT> addSprint(@RequestBody SprintTT sprint) {
-        try {
-            SprintTT saved = sprintTTService.addSprint(sprint);
-            return new ResponseEntity<>(saved, HttpStatus.OK);
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
+        SprintTT saved = sprintTTService.addSprint(sprint);
+        return ControllerHelper.created(saved, saved.getSprId());
     }
 
-    @PutMapping(value = "/sprints/{id}")
+    @PutMapping("/sprints/{id}")
     public ResponseEntity<SprintTT> updateSprint(@RequestBody SprintTT sprint, @PathVariable long id) {
+        return ControllerHelper.okOrNotFound(sprintTTService.updateSprint(id, sprint));
+    }
+
+    /**
+     * Manual sprint termination — called when manager presses "Terminar Sprint"
+     * (project has autoCloseSprints=false). Closes the sprint and activates the
+     * closest available next sprint. Returns the newly activated sprint, or 204
+     * NO_CONTENT if none existed.
+     */
+    @PatchMapping("/sprints/{id}/end")
+    public ResponseEntity<SprintTT> endSprint(@PathVariable long id) {
         try {
-            SprintTT updated = sprintTTService.updateSprint(id, sprint);
-            if (updated == null) {
-                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(updated, HttpStatus.OK);
+            SprintTT next = sprintTTService.closeSprintAndActivateNext(id);
+            return next != null
+                    ? new ResponseEntity<>(next, HttpStatus.OK)
+                    : new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    @DeleteMapping(value = "/sprints/{id}")
-    public ResponseEntity<Boolean> deleteSprint(@PathVariable long id) {
-        Boolean flag = false;
+    @PatchMapping("/sprints/{id}/close")
+    public ResponseEntity<SprintTT> closeSprint(
+            @PathVariable long id,
+            @RequestParam(required = false) Long nextSprintId) {
         try {
-            flag = sprintTTService.deleteSprint(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
+            SprintTT closed = sprintTTService.closeSprint(id, nextSprintId);
+            return ControllerHelper.okOrNotFound(closed);
         } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @DeleteMapping("/sprints/{id}")
+    public ResponseEntity<Boolean> deleteSprint(@PathVariable long id) {
+        return ControllerHelper.deleted(sprintTTService.deleteSprint(id));
     }
 }

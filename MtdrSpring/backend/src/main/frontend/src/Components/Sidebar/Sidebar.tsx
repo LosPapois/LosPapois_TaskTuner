@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ArchiveBoxIcon,
   ArrowRightStartOnRectangleIcon,
   PlusIcon,
   UserCircleIcon,
@@ -25,6 +26,8 @@ interface ProjectDTO {
   dateStartPj?: string | null;
   dateEndSetPj?: string | null;
   dateEndRealPj?: string | null;
+  autoRollover?: boolean;
+  autoCloseSprints?: boolean;
 }
 
 interface SessionUser {
@@ -73,9 +76,11 @@ function Sidebar({ isOpen }: SidebarProps) {
 
   useEffect(() => {
     let cancelled = false;
-    // /api/projects (no /open) returns ALL projects, including closed ones.
-    // The sidebar shows everything so archived/closed projects stay reachable.
-    fetch('/api/projects')
+    // Only fetch projects the logged-in user is a member of. If there is no
+    // session yet we skip the fetch and let the empty state render.
+    const currentUser = getFromStorage<SessionUser>(STORAGE_KEYS.USER);
+    if (!currentUser?.userId) return;
+    fetch(`/api/projects/user/${currentUser.userId}`)
       .then(res => (res.ok ? res.json() : null))
       .then((data: ProjectDTO[] | null) => {
         if (cancelled || data === null) return; // Allow empty arrays, reject null (network error)
@@ -89,6 +94,15 @@ function Sidebar({ isOpen }: SidebarProps) {
       cancelled = true;
     };
   }, []);
+
+  // Sidebar only lists active projects — finalized ones live behind the
+  // dedicated /archive entry so the active workspace stays uncluttered.
+  // Mock projects (negative pjId, no end date) are kept visible so the
+  // offline preview still works.
+  const activeProjects = useMemo(
+    () => projects.filter(p => p.dateEndRealPj == null || p.dateEndRealPj === ''),
+    [projects]
+  );
 
   const handleSignOut = useCallback(() => {
     removeFromStorage(STORAGE_KEYS.AUTH_TOKEN);
@@ -140,6 +154,34 @@ function Sidebar({ isOpen }: SidebarProps) {
     },
     [addSprintFor]
   );
+
+  const handleProjectClosed = useCallback((projectId: number) => {
+    setProjects(prev => {
+      const updated = prev.map(p =>
+        p.pjId === projectId ? { ...p, dateEndRealPj: new Date().toISOString().slice(0, 10) } : p
+      );
+      saveToStorage(STORAGE_KEYS.PROJECTS, updated);
+      return updated;
+    });
+  }, []);
+
+  const handleProjectDeleted = useCallback((projectId: number) => {
+    setProjects(prev => {
+      const updated = prev.filter(p => p.pjId !== projectId);
+      saveToStorage(STORAGE_KEYS.PROJECTS, updated);
+      return updated;
+    });
+  }, []);
+
+  const handleProjectUpdated = useCallback((projectId: number, name: string, autoRollover: boolean, autoCloseSprints: boolean) => {
+    setProjects(prev => {
+      const updated = prev.map(p =>
+        p.pjId === projectId ? { ...p, namePj: name, autoRollover, autoCloseSprints } : p
+      );
+      saveToStorage(STORAGE_KEYS.PROJECTS, updated);
+      return updated;
+    });
+  }, []);
 
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [addProjectSubmitting, setAddProjectSubmitting] = useState(false);
@@ -240,33 +282,35 @@ function Sidebar({ isOpen }: SidebarProps) {
           <button
             type="button"
             onClick={handleOpenAddProject}
-            className="flex items-center justify-center gap-2 w-full mb-3 px-3 py-2.5 rounded-lg
-                       text-sm font-semibold text-white bg-brand hover:bg-brand-dark
-                       transition-colors text-left"
+            className="btn-primary w-full flex items-center justify-center gap-2 mb-3"
           >
             <PlusIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
             <span className="truncate">Add Project</span>
           </button>
 
-          {projects.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-gray-400">No projects yet</p>
+          {activeProjects.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-gray-400">No active projects</p>
           ) : (
-            projects.map((p, idx) => (
+            activeProjects.map((p, idx) => (
               <SidebarProjectGroup
                 key={p.pjId}
                 projectId={p.pjId}
                 projectName={p.namePj}
-                // Open the first project by default so the new structure is
-                // discoverable on first paint. Subsequent groups stay collapsed.
+                autoRollover={p.autoRollover ?? false}
+                autoCloseSprints={p.autoCloseSprints ?? false}
                 defaultOpen={idx === 0}
                 onAddSprint={openAddSprint}
                 refreshToken={sprintVersions[p.pjId] ?? 0}
+                onProjectClosed={handleProjectClosed}
+                onProjectDeleted={handleProjectDeleted}
+                onProjectUpdated={handleProjectUpdated}
               />
             ))
           )}
         </nav>
 
         <div className="px-3 py-3 border-t border-gray-100 space-y-1">
+          <SidebarItem icon={ArchiveBoxIcon} label="Archive" to="/archive" />
           <SidebarItem icon={UserCircleIcon} label="Profile" to="/profile" />
           <SidebarItem
             icon={ArrowRightStartOnRectangleIcon}

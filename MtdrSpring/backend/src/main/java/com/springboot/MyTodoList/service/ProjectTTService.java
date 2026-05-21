@@ -9,8 +9,6 @@ import com.springboot.MyTodoList.repository.ProjectUserTTRepository;
 import com.springboot.MyTodoList.repository.SprintTTRepository;
 import com.springboot.MyTodoList.repository.UserTTRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,16 +54,11 @@ public class ProjectTTService {
     /**
      * Returns a single project by its primary key.
      *
-     * @param id  the pj_id to look up
-     * @return 200 OK with project, or 404 NOT FOUND
+     * @param id the pj_id to look up
+     * @return Optional containing the project if found
      */
-    public ResponseEntity<ProjectTT> getProjectById(long id) {
-        Optional<ProjectTT> found = projectTTRepository.findById(id);
-        if (found.isPresent()) {
-            return new ResponseEntity<>(found.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Optional<ProjectTT> getProjectById(long id) {
+        return projectTTRepository.findById(id);
     }
 
     /**
@@ -77,9 +70,17 @@ public class ProjectTTService {
     }
 
     /**
+     * Returns only the projects where the given user is a team member.
+     * Used by the frontend so each user sees their own project list.
+     */
+    public List<ProjectTT> getProjectsForUser(long userId) {
+        return projectTTRepository.findByUserMembership(userId);
+    }
+
+    /**
      * Search projects by name keyword (case-insensitive).
      *
-     * @param keyword  partial project name to search for
+     * @param keyword partial project name to search for
      */
     public List<ProjectTT> searchByName(String keyword) {
         return projectTTRepository.findByNamePjContainingIgnoreCase(keyword);
@@ -90,7 +91,7 @@ public class ProjectTTService {
     /**
      * Creates a new project.
      *
-     * @param newProject  the ProjectTT to insert (pjId should be 0 for new records)
+     * @param newProject the ProjectTT to insert (pjId should be 0 for new records)
      * @return the saved entity with the DB-assigned pjId populated
      */
     public ProjectTT addProject(ProjectTT newProject) {
@@ -112,6 +113,8 @@ public class ProjectTTService {
             project.setDateStartPj(updatedProject.getDateStartPj());
             project.setDateEndSetPj(updatedProject.getDateEndSetPj());
             project.setDateEndRealPj(updatedProject.getDateEndRealPj());
+            project.setAutoRollover(updatedProject.isAutoRollover());
+            project.setAutoCloseSprints(updatedProject.isAutoCloseSprints());
             return projectTTRepository.save(project);
         } else {
             return null;
@@ -119,21 +122,42 @@ public class ProjectTTService {
     }
 
     /**
+     * Partial update — only touches namePj and autoRollover.
+     * All other fields (dates, etc.) are read from the existing DB row,
+     * so they can never be accidentally wiped by a partial payload.
+     *
+     * @param id           the pj_id to update
+     * @param namePj       new project name
+     * @param autoRollover new rollover setting
+     * @return the saved project, or null if not found
+     */
+    public ProjectTT updateProjectSettings(long id, String namePj, boolean autoRollover, boolean autoCloseSprints) {
+        Optional<ProjectTT> existing = projectTTRepository.findById(id);
+        if (!existing.isPresent()) return null;
+        ProjectTT project = existing.get();
+        if (namePj != null && !namePj.isBlank()) project.setNamePj(namePj);
+        project.setAutoRollover(autoRollover);
+        project.setAutoCloseSprints(autoCloseSprints);
+        return projectTTRepository.save(project);
+    }
+
+    /**
      * Closes a project and cascades the state change to all related data.
      *
      * Steps (all within one transaction):
-     *   1. Set date_end_real_pj = today on PROJECT_TT.
-     *   2. Mark every sprint of this project as 'done' in SPRINT_TT.
-     *   3. Remove all developer memberships from PROJECT_USER_TT
-     *      (manager memberships are preserved so they keep historical access).
+     * 1. Set date_end_real_pj = today on PROJECT_TT.
+     * 2. Mark every sprint of this project as 'done' in SPRINT_TT.
+     * 3. Remove all developer memberships from PROJECT_USER_TT
+     * (manager memberships are preserved so they keep historical access).
      *
-     * @param id  the pj_id of the project to close
+     * @param id the pj_id of the project to close
      * @return the updated project, or null if not found
      */
     @Transactional
     public ProjectTT closeProject(long id) {
         Optional<ProjectTT> existing = projectTTRepository.findById(id);
-        if (!existing.isPresent()) return null;
+        if (!existing.isPresent())
+            return null;
 
         // 1. Record today as the actual close date
         ProjectTT project = existing.get();
@@ -163,7 +187,7 @@ public class ProjectTTService {
      * Deletes a project by its primary key.
      * Oracle's ON DELETE CASCADE removes linked sprints, tasks, and documents.
      *
-     * @param id  the pj_id to delete
+     * @param id the pj_id to delete
      * @return true if deleted, false if an exception occurred
      */
     public boolean deleteProject(long id) {

@@ -49,7 +49,7 @@ interface KpiTileProps {
 
 function KpiTile({ label, value, caption, icon, iconBg, barColor, barPercent }: KpiTileProps) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 transition-shadow hover:shadow-md hover:shadow-brand/10">
+    <div className="card-secondary">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500">{label}</span>
         <span className={`flex size-8 items-center justify-center rounded-lg ${iconBg}`}>

@@ -11,14 +11,16 @@ public enum BotCommands {
 	ADD_ITEM("/addtask"),
 	STATUS("/status"),
 	MARK_DONE("/done"),
-	MARK_REWORK("/rework"),
 	MARK_UNDO("/undo"),
 	EDIT_TASK("/edittask"),
-	LLM_REQ("/llm"),
 	ASK_COMMAND("/ask"),
 	ADD_FEATURE("/addfeature"),
 	EDIT_FEATURE("/editfeature"),
-	AI_CREATE("/aicreate");
+	AI_CREATE("/aicreate"),
+	IMPORT_TASKS("/importtasks"),
+	UPLOAD_DOC("/uploaddoc"),
+	LIST_DOCS("/listdocs"),
+	LLM_REQ("/llm");
 
 	private final String command;
 

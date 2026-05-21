@@ -26,6 +26,9 @@ import { getFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
 import TaskDetailModal from '../Components/Common/TaskDetailModal';
 import type { TaskDetailData } from '../Components/Common/TaskDetailModal';
 import PageLoading from '../Components/Common/PageLoading';
+import ProgressBar from '../Components/Common/ProgressBar';
+import Sparkline from '../Components/Common/Sparkline';
+import useProjectKpis from '../Hooks/useProjectKpis';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock data — visual-only until the team / KPI endpoints are wired.
@@ -34,69 +37,22 @@ import PageLoading from '../Components/Common/PageLoading';
 // the same shape into the components.
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface ProjectDTO {
-  pjId: number;
-  namePj: string;
-}
-
-/** Backend ProjectUserTT shape — composite key (pjId, userId). */
-interface MembershipDTO {
-  pjId: number;
-  userId: number;
-}
-
-/** Backend UserTT shape — only fields the team page consumes. */
-interface UserDTO {
-  userId: number;
-  nameUser: string;
-  mail: string | null;
-  idTelegram: string;
-  role: string;
-  password?: string | null;
-}
-
-interface MockMember {
-  id: number;
-  name: string;
-  role: string;
-  rawRole?: string;
-  telegram?: string;
-  email: string;
-  avatarTone: AvatarTone;
-}
-
-/** Backend TaskTT shape — fields used by KPI calc and the tasks list. */
-interface TaskDTO {
-  taskId: number;
-  nameTask: string | null;
-  /** Long-text description (TaskTT.infoTask). */
-  infoTask: string | null;
-  userId: number;
-  pjId: number;
-  storyPoints: number | null;
-  priority: string | null;
-  dateStartTask: string | null;
-  dateEndRealTask: string | null;
-  featureId: number | null;
-}
-
-/** Backend FeatureTT shape. */
-interface FeatureDTO {
-  featureId: number;
-  nameFeature: string;
-  priorityFeature: string | null;
-  sprId: number;
-}
-
-/** Map backend priority strings to the panel's tagged union. */
-function mapPriority(p: string | null | undefined): MemberTaskPriority {
-  switch ((p ?? '').toLowerCase()) {
-    case 'high':   return 'high';
-    case 'medium': return 'medium';
-    case 'low':    return 'low';
-    default:       return 'none';
-  }
-}
+import {
+  ProjectDTO,
+  MembershipDTO,
+  UserDTO,
+  TaskDTO,
+  FeatureDTO,
+} from '../Utils/types';
+import { mapTaskPriority } from '../Utils/helpers';
+import {
+  MockMember,
+  MOCK_MEMBERS,
+  MemberKpis,
+  MOCK_MEMBER_KPIS,
+  EMPTY_MEMBER_KPIS,
+} from '../Utils/mockData';
+import { computeMemberKpis } from '../Utils/kpiUtils';
 
 /** Rank priorities so "Alta" sorts above "Media" etc. in the tasks list. */
 const PRIORITY_ORDER: Record<MemberTaskPriority, number> = {
@@ -109,55 +65,6 @@ const PRIORITY_ORDER: Record<MemberTaskPriority, number> = {
 /** Per-project cache key — team rosters are stored separately for each project. */
 const teamCacheKey = (projectId: number) =>
   `${STORAGE_KEYS.TEAM_MEMBERS}_${projectId}`;
-
-/**
- * Compute the 4 KPI tiles shown in the member detail panel from the
- * backing task list. Pure function — easy to swap to a backend endpoint
- * later without touching the consumer.
- *
- * Definitions:
- *   - tasksCompleted = count of member's tasks with dateEndRealTask set
- *   - cycleTime      = avg days between dateStartTask and dateEndRealTask
- *                      across the member's completed tasks
- *   - features       = distinct featureId values across the member's tasks
- *                      (a feature "counts as assigned" if the user owns
- *                      at least one task in it)
- *   - progress       = % of the member's tasks that are completed
- */
-function computeMemberKpis(
-  projectTasks: TaskDTO[],
-  memberId: number
-): MemberKpis {
-  const myTasks = projectTasks.filter(t => t.userId === memberId);
-  const total = myTasks.length;
-  if (total === 0) return EMPTY_MEMBER_KPIS;
-
-  const completed = myTasks.filter(t => t.dateEndRealTask != null);
-  const completedCount = completed.length;
-
-  // Cycle time: only meaningful for tasks that have both dates.
-  const dayMs = 1000 * 60 * 60 * 24;
-  const withDates = completed.filter(t => t.dateStartTask && t.dateEndRealTask);
-  const avgCycleDays = withDates.length === 0
-    ? 0
-    : withDates.reduce((sum, t) => {
-        const start = new Date(t.dateStartTask!).getTime();
-        const end   = new Date(t.dateEndRealTask!).getTime();
-        return sum + Math.max(0, (end - start) / dayMs);
-      }, 0) / withDates.length;
-
-  const distinctFeatures = new Set(
-    myTasks.map(t => t.featureId).filter((f): f is number => f != null)
-  );
-
-  return {
-    tasksCompleted: completedCount,
-    cycleTime:      `${avgCycleDays.toFixed(1)} days`,
-    assignedTasks:  total,
-    features:       distinctFeatures.size,
-    progress:       `${Math.round((completedCount / total) * 100)}%`,
-  };
-}
 
 /** Convert a backend UserTT into the display shape used by the page/components. */
 function mapBackendUser(u: UserDTO): MockMember {
@@ -177,89 +84,10 @@ function mapBackendUser(u: UserDTO): MockMember {
   };
 }
 
-const MOCK_MEMBERS: MockMember[] = [
-  { id: 1, name: 'Ana García',   role: 'Frontend Developer', rawRole: 'developer', telegram: '@ana_garcia', email: 'ana.garcia@tasktuner.com',   avatarTone: 'brand'   },
-  { id: 2, name: 'Carlos Ruiz',  role: 'Backend Developer',  rawRole: 'developer', telegram: '@carlos_ruiz', email: 'carlos.ruiz@tasktuner.com',  avatarTone: 'brand'   },
-  { id: 3, name: 'María López',  role: 'QA Engineer',        rawRole: 'developer', telegram: '@maria_lopez', email: 'maria.lopez@tasktuner.com',  avatarTone: 'brand'   },
-  { id: 4, name: 'Juan Pérez',   role: 'DevOps Engineer',    rawRole: 'developer', telegram: '@juan_perez', email: 'juan.perez@tasktuner.com',   avatarTone: 'neutral' },
-];
-
-interface MemberKpis {
-  tasksCompleted: number;
-  cycleTime: string;
-  assignedTasks: number;
-  features: number;
-  progress: string;
-}
-
-const MOCK_MEMBER_KPIS: Record<number, MemberKpis> = {
-  1: { tasksCompleted: 2, cycleTime: '2.5 days', assignedTasks: 4, features: 2, progress: '50%' },
-  2: { tasksCompleted: 0, cycleTime: '0 days',   assignedTasks: 0, features: 0, progress: '0%'  },
-  3: { tasksCompleted: 0, cycleTime: '0 days',   assignedTasks: 0, features: 0, progress: '0%'  },
-  4: { tasksCompleted: 0, cycleTime: '0 days',   assignedTasks: 0, features: 0, progress: '0%'  },
-};
-
-const EMPTY_MEMBER_KPIS: MemberKpis = {
-  tasksCompleted: 0,
-  cycleTime: '—',
-  assignedTasks: 0,
-  features: 0,
-  progress: '—',
-};
-
-const PROJECT_KPIS = {
-  avgProgress: 50,
-  carryRate: 0,
-  taskDelay: 0,
-  cycleTime: '2.9 days',
-  projectDelay: '0 days',
-  expectedDate: '14/6/2026',
-  sprintsCount: 3,
-  delayedTasks: 0,
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Inline visualizations — kept here because they're throwaway shapes specific
 // to these mock cards. Promote to /Components when real data drives them.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Linear progress bar used by the top-level progress KPI cards. */
-function ProgressBar({ value }: { value: number }) {
-  const safe = Math.max(0, Math.min(value, 100));
-
-  return (
-    <div className="space-y-1.5">
-      <div
-        className="w-full h-2.5 rounded-full bg-green-50 border border-green-100 overflow-hidden"
-        role="progressbar"
-        aria-valuenow={safe}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-green-400 via-green-500 to-emerald-600 transition-[width] duration-500"
-          style={{ width: `${safe}%` }}
-        />
-      </div>
-      <div className="text-[11px] text-green-700 font-medium">Progress tracked at {safe}%</div>
-    </div>
-  );
-}
-
-/** Decorative cycle-time sparkline. */
-function Sparkline() {
-  return (
-    <svg
-      viewBox="0 0 100 20"
-      preserveAspectRatio="none"
-      className="w-full h-5"
-      aria-hidden="true"
-    >
-      <path d="M 0 15 Q 25 6, 50 9 T 100 12" fill="none" stroke="#3B82F6" strokeWidth="2" />
-    </svg>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
@@ -292,6 +120,13 @@ export default function TeamPage() {
 
   // All users in the system — used to populate the "Add Existing User" dropdown
   const [allUsers, setAllUsers] = useState<UserDTO[]>([]);
+
+  // Cross-project membership snapshot — needed to enforce the "a user can
+  // only belong to one active project at a time" rule. Both pieces are
+  // refreshed alongside membersRefreshToken so the modal sees up-to-date
+  // assignments after every add/remove.
+  const [allProjects, setAllProjects] = useState<ProjectDTO[]>([]);
+  const [allMemberships, setAllMemberships] = useState<MembershipDTO[]>([]);
 
   // Selection is nullable so we can render an empty state when no members.
   const [selectedId, setSelectedId] = useState<number | null>(
@@ -409,7 +244,7 @@ export default function TeamPage() {
         if (cancelled) return;
         setAllFeatures(data);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => {
         if (!cancelled) setFeaturesLoading(false);
       });
@@ -427,11 +262,133 @@ export default function TeamPage() {
         if (cancelled) return;
         setAllUsers(data);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Fetch all projects + all memberships so the "Add Existing User" modal
+  // can warn when a candidate is already in another active project.
+  // Tied to membersRefreshToken so the snapshot stays fresh after the
+  // current page itself adds or removes a member.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch('/api/projects')
+        .then(r => (r.ok ? r.json() : []))
+        .catch(() => []),
+      fetch('/api/project-memberships')
+        .then(r => (r.ok ? r.json() : []))
+        .catch(() => []),
+    ]).then(([projects, memberships]: [ProjectDTO[], MembershipDTO[]]) => {
+      if (cancelled) return;
+      setAllProjects(projects ?? []);
+      setAllMemberships(memberships ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [membersRefreshToken]);
+
+  // userId → name of the OTHER active project the user is already on.
+  // Built fresh from the latest memberships + projects snapshot.
+  // Active = dateEndRealPj is null/empty. The current project is excluded
+  // because users in it are already filtered out via currentTeamMemberIds.
+  const blockedUsersByActiveProject = useMemo(() => {
+    const map = new Map<number, string>();
+    if (projectId == null) return map;
+
+    const activeProjectsById = new Map<number, ProjectDTO>();
+    for (const p of allProjects) {
+      const isActive = p.dateEndRealPj == null || p.dateEndRealPj === '';
+      if (isActive && p.pjId !== projectId) {
+        activeProjectsById.set(p.pjId, p);
+      }
+    }
+
+    for (const m of allMemberships) {
+      const proj = activeProjectsById.get(m.pjId);
+      if (proj && !map.has(m.userId)) {
+        map.set(m.userId, proj.namePj);
+      }
+    }
+    return map;
+  }, [allProjects, allMemberships, projectId]);
+
+  // ─── Project-level KPIs ────────────────────────────────────────────────
+  // Source of truth for the "Average Project KPIs" section. The hook hits
+  // /api/projects/{pjId}/kpis/{velocity,retrabajo,completitud}. Cycle time
+  // and project delay aren't backend KPIs (yet) so we compute them client-
+  // side from data the page already loads (allTasks + allProjects).
+  const projectKpis = useProjectKpis(projectId);
+
+  /** Average days from dateStartTask → dateEndRealTask across this project's
+   *  finished tasks. Returns null when no task has both dates filled. */
+  const avgCycleTimeDays = useMemo<number | null>(() => {
+    if (projectId == null || projectId < 0) return null;
+    const finished = allTasks.filter(
+      t => t.pjId === projectId && t.dateStartTask && t.dateEndRealTask
+    );
+    if (finished.length === 0) return null;
+
+    const totalDays = finished.reduce((sum, t) => {
+      const start = new Date(t.dateStartTask!).getTime();
+      const end = new Date(t.dateEndRealTask!).getTime();
+      if (Number.isNaN(start) || Number.isNaN(end)) return sum;
+      const days = (end - start) / (1000 * 60 * 60 * 24);
+      // Clamp negatives in case of clock skew or out-of-order dates.
+      return sum + Math.max(0, days);
+    }, 0);
+
+    return totalDays / finished.length;
+  }, [allTasks, projectId]);
+
+  /** Project delay relative to its planned end date. Positive = late, zero or
+   *  negative = on track. When the project is finalized we anchor against
+   *  dateEndRealPj; otherwise we compare against today. */
+  const projectDelayInfo = useMemo<{
+    days: number;
+    label: string;
+    expectedDate: string | null;
+    tone: 'success' | 'warning' | 'danger';
+  } | null>(() => {
+    if (projectId == null || projectId < 0) return null;
+    const project = allProjects.find(p => p.pjId === projectId);
+    if (!project?.dateEndSetPj) return null;
+
+    const expected = new Date(project.dateEndSetPj);
+    if (Number.isNaN(expected.getTime())) return null;
+
+    const reference = project.dateEndRealPj
+      ? new Date(project.dateEndRealPj)
+      : new Date();
+    if (Number.isNaN(reference.getTime())) return null;
+
+    const diffMs = reference.getTime() - expected.getTime();
+    const days = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+    const expectedFormatted = expected.toLocaleDateString('en-US', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+
+    if (days <= 0) {
+      return {
+        days: 0,
+        label: 'On track',
+        expectedDate: expectedFormatted,
+        tone: 'success',
+      };
+    }
+    return {
+      days,
+      label: `${days} day${days === 1 ? '' : 's'} late`,
+      expectedDate: expectedFormatted,
+      tone: days > 7 ? 'danger' : 'warning',
+    };
+  }, [allProjects, projectId]);
 
   const isPageLoading =
     projectId != null
@@ -495,7 +452,7 @@ export default function TeamPage() {
           name: t.nameTask ?? `Task #${t.taskId}`,
           description: t.infoTask,
           featureName: f?.nameFeature,
-          priority: mapPriority(t.priority),
+          priority: mapTaskPriority(t.priority) as MemberTaskPriority,
           storyPoints: t.storyPoints,
           done: t.dateEndRealTask != null,
         };
@@ -522,7 +479,7 @@ export default function TeamPage() {
       name: taskDTO.nameTask ?? `Task #${taskDTO.taskId}`,
       description: taskDTO.infoTask ?? null,
       storyPoints: taskDTO.storyPoints,
-      priority: mapPriority(taskDTO.priority),
+      priority: mapTaskPriority(taskDTO.priority) as MemberTaskPriority,
       developerName: dev?.name ?? 'Unassigned',
       state: taskDTO.dateEndRealTask ? 'Closed' : 'Active',
     });
@@ -624,6 +581,17 @@ export default function TeamPage() {
   const handleConfirmAddExistingMember = async (userId: number) => {
     if (projectId == null || projectId < 0) {
       setAddMemberError('Cannot add members to demo projects.');
+      return;
+    }
+
+    // Defense-in-depth: even though the modal disables blocked users, we
+    // re-check here in case the snapshot changed between render and submit
+    // (e.g. another tab added the user to a different project meanwhile).
+    const blockingProject = blockedUsersByActiveProject.get(userId);
+    if (blockingProject) {
+      setAddMemberError(
+        `This user is already assigned to "${blockingProject}". A user can only belong to one active project at a time.`
+      );
       return;
     }
 
@@ -760,6 +728,7 @@ export default function TeamPage() {
           role: u.role,
         }))}
         currentTeamMemberIds={currentTeamMemberIds}
+        blockedUsersByActiveProject={blockedUsersByActiveProject}
         submitting={addMemberSubmitting}
         error={addMemberError}
       />
@@ -770,10 +739,10 @@ export default function TeamPage() {
         initialData={
           selectedMember
             ? {
-                nameUser: selectedMember.name,
-                idTelegram: selectedMember.telegram ?? '',
-                mail: selectedMember.email,
-              }
+              nameUser: selectedMember.name,
+              idTelegram: selectedMember.telegram ?? '',
+              mail: selectedMember.email,
+            }
             : null
         }
         title="Edit Team Member"
@@ -791,163 +760,211 @@ export default function TeamPage() {
       />
 
       {isPageLoading ? (
-        <div className="max-w-7xl mx-auto">
+        <div className="container-main">
           <PageLoading
             title="Loading project team..."
             subtitle="Fetching members, tasks, and features to render the full view."
           />
         </div>
       ) : (
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Page header */}
-        <header>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {projectName} - Team
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage team members and track their KPIs
-          </p>
-        </header>
+        <div className="container-main space-y-8">
+          {/* Page header */}
+          <header>
+            <h1 className="heading-h2">
+              {projectName} - Team
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Manage team members and track their KPIs
+            </p>
+          </header>
 
-        {/* Project-level KPIs */}
-        <section aria-labelledby="project-kpis-heading">
-          <h2
-            id="project-kpis-heading"
-            className="flex items-center gap-3 text-xl font-bold text-gray-800 mb-4"
-          >
-            <span className="h-5 w-1 bg-brand rounded-full" aria-hidden="true" />
-            Average Project KPIs
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <KpiCard
-              label="Average Progress"
-              value={`${PROJECT_KPIS.avgProgress}%`}
-              icon={ArrowTrendingUpIcon}
-              tone="success"
-            >
-              <ProgressBar value={PROJECT_KPIS.avgProgress} />
-            </KpiCard>
-
-            <KpiCard
-              label="Average Carryover Rate"
-              value={`${PROJECT_KPIS.carryRate}%`}
-              icon={ExclamationCircleIcon}
-              tone="warning"
-            >
-              <p className="text-xs text-gray-500">
-                Average across {PROJECT_KPIS.sprintsCount} sprints
-              </p>
-            </KpiCard>
-
-            <KpiCard
-              label="Average Task Delay"
-              value={`${PROJECT_KPIS.taskDelay}%`}
-              icon={ExclamationCircleIcon}
-              tone="danger"
-            >
-              <p className="text-xs text-gray-500">
-                {PROJECT_KPIS.delayedTasks} delayed tasks
-              </p>
-            </KpiCard>
-
-            <KpiCard
-              label="Average Cycle Time"
-              value={PROJECT_KPIS.cycleTime}
-              icon={ClockIcon}
-              tone="info"
-            >
-              <Sparkline />
-            </KpiCard>
-
-            <KpiCard
-              label="Project Delay"
-              value={PROJECT_KPIS.projectDelay}
-              icon={CalendarDaysIcon}
-              tone="success"
-            >
-              <p className="text-xs text-gray-500">
-                Expected date: {PROJECT_KPIS.expectedDate}
-              </p>
-            </KpiCard>
-          </div>
-        </section>
-
-        {/* Members section */}
-        <section
-          aria-labelledby="members-heading"
-          className="bg-white border border-gray-200 rounded-xl p-6
-                     shadow-sm shadow-gray-200/60"
-        >
-          <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+          {/* Project-level KPIs */}
+          <section aria-labelledby="project-kpis-heading">
             <h2
-              id="members-heading"
-              className="flex items-center gap-3 text-xl font-bold text-gray-800"
+              id="project-kpis-heading"
+              className="flex items-center gap-3 text-xl font-bold text-gray-800 mb-4"
             >
               <span className="h-5 w-1 bg-brand rounded-full" aria-hidden="true" />
-              Team Members
+              Average Project KPIs
             </h2>
-
-            <button
-              type="button"
-              onClick={handleOpenAddMember}
-              disabled={projectId == null || projectId < 0}
-              className="px-4 py-2.5 rounded-xl bg-brand text-white font-semibold text-sm
-                         hover:bg-brand-dark transition-colors disabled:opacity-60"
-            >
-              Add Team Member
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-            {/* Left: members list */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <UserGroupIcon
-                  className="h-5 w-5 text-gray-700"
-                  aria-hidden="true"
-                />
-                <span className="text-sm font-semibold text-gray-800">
-                  Members ({members.length})
-                </span>
-              </div>
-              {members.length === 0 ? (
-                <p className="text-sm text-gray-400 px-1">
-                  No members yet in this project.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {members.map(m => (
-                    <MemberListItem
-                      key={m.id}
-                      name={m.name}
-                      role={m.role}
-                      selected={m.id === selectedId}
-                      avatarTone={m.avatarTone}
-                      onSelect={() => setSelectedId(m.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Right: selected member detail */}
-            {selectedMember ? (
-              <MemberDetailPanel
-                member={selectedMember}
-                kpis={selectedKpis}
-                tasks={selectedTasks}
-                onEdit={handleOpenEditMember}
-                onDelete={handleOpenDeleteMember}
-                onTaskClick={handleTaskClick}
-              />
-            ) : (
-              <p className="text-sm text-gray-400 self-center text-center">
-                Select a member to view details.
+            {projectKpis.hasError && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mb-3">
+                Some KPI metrics could not be loaded. Showing the values that were
+                available; refresh the page to retry.
               </p>
             )}
-          </div>
-        </section>
-      </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <KpiCard
+                label="Average Progress"
+                value={
+                  projectKpis.loading
+                    ? '…'
+                    : projectKpis.avgProgress != null
+                      ? `${projectKpis.avgProgress.toFixed(0)}%`
+                      : '—'
+                }
+                icon={ArrowTrendingUpIcon}
+                tone="success"
+              >
+                {projectKpis.avgProgress != null ? (
+                  <ProgressBar value={projectKpis.avgProgress} />
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    No completed tasks reported by any sprint yet.
+                  </p>
+                )}
+              </KpiCard>
+
+              <KpiCard
+                label="Average Carryover Rate"
+                value={
+                  projectKpis.loading
+                    ? '…'
+                    : projectKpis.carryRate != null
+                      ? `${projectKpis.carryRate.toFixed(0)}%`
+                      : '—'
+                }
+                icon={ExclamationCircleIcon}
+                tone="warning"
+              >
+                <p className="text-xs text-gray-500">
+                  {projectKpis.sprintsCount > 0
+                    ? `Average across ${projectKpis.sprintsCount} ${projectKpis.sprintsCount === 1 ? 'sprint' : 'sprints'
+                    }`
+                    : 'No sprints recorded yet.'}
+                </p>
+              </KpiCard>
+
+              <KpiCard
+                label="Average Task Delay"
+                value={
+                  projectKpis.loading
+                    ? '…'
+                    : projectKpis.worstSprintRework != null
+                      ? `${projectKpis.worstSprintRework.toFixed(0)}%`
+                      : '—'
+                }
+                icon={ExclamationCircleIcon}
+                tone="danger"
+              >
+                <p className="text-xs text-gray-500">
+                  {projectKpis.sprintsCount > 0
+                    ? `${projectKpis.delayedSprintsCount} of ${projectKpis.sprintsCount} ${projectKpis.sprintsCount === 1 ? 'sprint' : 'sprints'
+                    } had delays`
+                    : 'No sprints recorded yet.'}
+                </p>
+              </KpiCard>
+
+              <KpiCard
+                label="Average Cycle Time"
+                value={
+                  avgCycleTimeDays == null
+                    ? '—'
+                    : `${avgCycleTimeDays.toFixed(1)} ${avgCycleTimeDays === 1 ? 'day' : 'days'
+                    }`
+                }
+                icon={ClockIcon}
+                tone="info"
+              >
+                {avgCycleTimeDays != null ? (
+                  <Sparkline />
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    Tracked once tasks have both a start and a real end date.
+                  </p>
+                )}
+              </KpiCard>
+
+              <KpiCard
+                label="Project Delay"
+                value={projectDelayInfo?.label ?? '—'}
+                icon={CalendarDaysIcon}
+                tone={projectDelayInfo?.tone ?? 'info'}
+              >
+                <p className="text-xs text-gray-500">
+                  {projectDelayInfo?.expectedDate
+                    ? `Expected date: ${projectDelayInfo.expectedDate}`
+                    : 'No planned end date set.'}
+                </p>
+              </KpiCard>
+            </div>
+          </section>
+
+          {/* Members section */}
+          <section
+            aria-labelledby="members-heading"
+            className="section-card"
+          >
+            <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+              <h2
+                id="members-heading"
+                className="heading-h4"
+              >
+                Team Members
+              </h2>
+
+              <button
+                type="button"
+                onClick={handleOpenAddMember}
+                disabled={projectId == null || projectId < 0}
+                className="px-4 py-2.5 rounded-xl bg-brand text-white font-semibold text-sm
+                         hover:bg-brand-dark transition-colors disabled:opacity-60"
+              >
+                Add Team Member
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+              {/* Left: members list */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <UserGroupIcon
+                    className="h-5 w-5 text-gray-700"
+                    aria-hidden="true"
+                  />
+                  <span className="text-sm font-semibold text-gray-800">
+                    Members ({members.length})
+                  </span>
+                </div>
+                {members.length === 0 ? (
+                  <p className="text-sm text-gray-400 px-1">
+                    No members yet in this project.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {members.map(m => (
+                      <MemberListItem
+                        key={m.id}
+                        name={m.name}
+                        role={m.role}
+                        selected={m.id === selectedId}
+                        avatarTone={m.avatarTone}
+                        onSelect={() => setSelectedId(m.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right: selected member detail */}
+              {selectedMember ? (
+                <MemberDetailPanel
+                  member={selectedMember}
+                  kpis={selectedKpis}
+                  tasks={selectedTasks}
+                  onEdit={handleOpenEditMember}
+                  onDelete={handleOpenDeleteMember}
+                  onTaskClick={handleTaskClick}
+                />
+              ) : (
+                <p className="text-sm text-gray-400 self-center text-center">
+                  Select a member to view details.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

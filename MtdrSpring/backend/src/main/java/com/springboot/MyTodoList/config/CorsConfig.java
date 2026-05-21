@@ -18,36 +18,37 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
     Logger logger = LoggerFactory.getLogger(CorsConfig.class);
-    
+
     @Bean
-    public CorsFilter corsFilter(){
+    public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        
-        // Allow localhost:3000 for development
-        config.setAllowedOrigins(List.of(
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "https://objectstorage.us-phoenix-1.oraclecloud.com",
-            "https://petstore.swagger.io"
-        ));
-        
+
+        // Allow localhost for development and ngrok tunnels for local sharing
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "https://*.ngrok-free.app",
+                "https://*.ngrok-free.dev",
+                "https://*.ngrok.io",
+                "https://objectstorage.us-phoenix-1.oraclecloud.com",
+                "https://petstore.swagger.io"));
+
         // Allow HTTP methods
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        
+
         // Allow all headers
         config.addAllowedHeader("*");
-        
+
         // Expose headers
         config.addExposedHeader("location");
         config.addExposedHeader("Content-Type");
-        
+
         // Allow credentials
         config.setAllowCredentials(true);
-        
+
         // Register configuration for all paths
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-        
+
         return new CorsFilter(source);
     }
 }

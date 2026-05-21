@@ -49,7 +49,41 @@ public enum BotMessages {
 	AI_CREATE_FEATURE_CONFIRM("✅ I'll create this feature:\n%s\nSelect priority below (or cancel):"),
 	AI_CREATE_UNKNOWN("❓ I could not understand what to create. Try again or use the manual buttons."),
 	AI_CREATE_CONFIRMED("✅ Created! Now select the sprint:"),
-	AI_CREATE_CANCELLED("❌ Creation cancelled.");
+	AI_CREATE_CANCELLED("❌ Creation cancelled."),
+	IMPORT_PROMPT(
+		"📥 *Import Tasks from Text*\n\n"
+		+ "Paste your text below and the AI will extract tasks automatically.\n\n"
+		+ "*Recommended format:*\n"
+		+ "```\n"
+		+ "- Fix login crash: button throws NullPointerException on submit [high, 2 pts]\n"
+		+ "- Add dark mode: allow users to switch between light and dark themes [low, 3 pts]\n"
+		+ "- Migrate DB schema: move user table from MySQL to PostgreSQL [critical, 8 pts]\n"
+		+ "```\n"
+		+ "Format: `- Name: description [priority, pts]`\n\n"
+		+ "You can also paste meeting notes, a requirements doc, or any free-form text — "
+		+ "the AI will find the action items.\n\n"
+		+ "*Priority hints:* use words like `urgent`, `critical`, `blocker` for HIGH; "
+		+ "`nice-to-have`, `optional`, `refactor` for LOW.\n"
+		+ "*Story point hints:* include a number followed by `pts` or `points`.\n\n"
+		+ "⚠️ *Warning:* all imported tasks will be assigned to a *single feature* "
+		+ "(you will choose it in the next step). If your tasks belong to different features, "
+		+ "import them separately.\n\n"
+		+ "Type /cancel to abort."),
+	IMPORT_PARSING("🤔 Extracting tasks from your text..."),
+	IMPORT_NO_TASKS("❓ No tasks found in the text. Try again with more detail or create tasks manually."),
+	IMPORT_PARSE_ERROR("❌ Failed to parse tasks. Try again or create tasks manually."),
+	IMPORT_SELECT_SPRINT("Select the sprint for all imported tasks:"),
+	IMPORT_SELECT_FEATURE("Select the feature for all imported tasks:"),
+	IMPORT_CONFIRM("📋 Found *%d task(s)*:\n\n%s\nCreate all in the selected sprint and feature?"),
+	IMPORT_SUCCESS("✅ Successfully created %d task(s)!"),
+	IMPORT_CANCELLED("❌ Import cancelled."),
+	DOC_UPLOAD_PROMPT("📎 Send me a document (PDF, DOCX, or TXT) and I will index it for RAG search."),
+	DOC_UPLOAD_PROCESSING("⏳ Processing your document..."),
+	DOC_UPLOAD_SUCCESS("✅ Document indexed! Use /ask to query it."),
+	DOC_UPLOAD_FAILED("❌ Could not process the file. Check it's a valid PDF, DOCX, or TXT under 20 MB."),
+	DOC_UPLOAD_NO_PROJECT("❌ You have no active project. Cannot index documents."),
+	DOC_LIST_EMPTY("📂 No documents indexed for your project yet. Use /uploaddoc to add one."),
+	DOC_RAG_CONTEXT_HEADER("📚 *Relevant context from your documents:*\n\n");
 
 	private String message;
 
