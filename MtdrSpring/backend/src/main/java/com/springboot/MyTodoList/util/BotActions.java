@@ -1330,6 +1330,11 @@ public class BotActions {
                         InlineKeyboardButton.builder()
                                 .text("✅ Done")
                                 .callbackData("DONE_TASK:" + taskId)
+                                .build()))
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                                .text("✏️ Edit")
+                                .callbackData("EDIT_PICK:" + taskId)
                                 .build(),
                         InlineKeyboardButton.builder()
                                 .text("🚪 Exit")
