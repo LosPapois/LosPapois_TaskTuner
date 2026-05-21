@@ -27,7 +27,12 @@ export { default as AddTaskModal } from './AddTaskModal';
 export type { AddTaskModalProps, NewTaskData, NewTaskPriority, FeatureOption } from './AddTaskModal';
 
 export { default as AddFeatureModal } from './AddFeatureModal';
-export type { AddFeatureModalProps, NewFeatureData, NewFeaturePriority } from './AddFeatureModal';
+export type {
+  AddFeatureModalProps,
+  NewFeatureData,
+  NewFeaturePriority,
+  InitialFeatureValues,
+} from './AddFeatureModal';
 
 export { default as DeveloperTaskBoard } from './DeveloperTaskBoard';
 export type {

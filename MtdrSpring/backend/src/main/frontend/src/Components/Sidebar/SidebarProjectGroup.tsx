@@ -157,14 +157,14 @@ function ProjectSettingsModal({
           <button
             onClick={onClose}
             disabled={submitting}
-            className="flex-1 rounded-xl border border-gray-200 bg-white py-3 text-base font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 btn-secondary"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={submitting || !name.trim()}
-            className="flex-1 rounded-xl bg-brand py-3 text-base font-semibold text-white shadow-md shadow-brand/25 hover:bg-brand-dark disabled:opacity-50"
+            className="flex-1 btn-primary"
           >
             {submitting ? 'Saving…' : 'Save Changes'}
           </button>
@@ -269,9 +269,7 @@ function SidebarProjectGroup({
           type="button"
           onClick={toggle}
           aria-expanded={isOpen}
-          className="flex items-center gap-2 flex-1 min-w-0 px-3 py-2 rounded-lg text-sm font-medium
-                     text-gray-700 hover:bg-brand-lighter hover:text-brand-dark
-                     transition-colors text-left"
+          className="sidebar-item flex-1 min-w-0"
         >
           <ChevronRightIcon
             className={`size-4 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`}
@@ -298,10 +296,7 @@ function SidebarProjectGroup({
                   setMenuOpen(true);
                 }
               }}
-              className="flex items-center justify-center rounded-md p-1
-                         text-gray-400 hover:text-gray-700 hover:bg-gray-100
-                         opacity-0 group-hover/row:opacity-100 focus:opacity-100
-                         transition-opacity"
+              className="btn-icon-light opacity-0 group-hover/row:opacity-100 focus:opacity-100"
               aria-label="Project options"
             >
               <EllipsisVerticalIcon className="size-4" />
@@ -330,14 +325,14 @@ function SidebarProjectGroup({
                     }
                     setShowSettings(true);
                   }}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-brand-lighter"
+                  className="menu-item-default"
                 >
                   <Cog6ToothIcon className="size-4 text-gray-500" />
                   Project Settings
                 </button>
                 <button
                   onClick={() => { setMenuOpen(false); setMenuPos(null); setShowCloseModal(true); }}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50"
+                  className="menu-item-warning"
                 >
                   <XCircleIcon className="size-4 text-orange-500" />
                   Close Project
@@ -345,7 +340,7 @@ function SidebarProjectGroup({
                 <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={() => { setMenuOpen(false); setMenuPos(null); setShowDeleteModal(true); }}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  className="menu-item-danger"
                 >
                   <TrashIcon className="size-4" />
                   Delete Project
@@ -383,10 +378,9 @@ function SidebarProjectGroup({
           <button
             type="button"
             onClick={handleAddSprint}
-            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-sm font-medium
-                       text-brand-dark hover:bg-brand-lighter transition-colors text-left"
+            className="sidebar-item-dense text-brand-dark hover:bg-brand-lighter"
           >
-            <PlusIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <PlusIcon className="size-5 shrink-0" aria-hidden="true" />
             <span className="truncate">Add Sprint</span>
           </button>
         </div>

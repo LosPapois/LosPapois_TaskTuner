@@ -2,12 +2,13 @@ import React from 'react';
 
 export type KpiTone = 'success' | 'warning' | 'danger' | 'info' | 'brand';
 
-const TONE_CLASSES: Record<KpiTone, string> = {
-  success: 'bg-green-100 text-green-600',
-  warning: 'bg-orange-100 text-orange-500',
-  danger: 'bg-red-100 text-red-500',
-  info: 'bg-blue-100 text-blue-500',
-  brand: 'bg-brand-lighter text-brand-dark',
+/** Mapping of tones to icon badge classes (from globals.css design system) */
+const TONE_TO_ICON_CLASS: Record<KpiTone, string> = {
+  success: 'icon-badge-success',
+  warning: 'icon-badge-warning',
+  danger: 'icon-badge-danger',
+  info: 'icon-badge-info',
+  brand: 'icon-badge-brand',
 };
 
 export interface KpiCardProps {
@@ -27,29 +28,34 @@ export interface KpiCardProps {
 }
 
 /**
- * Generic KPI card used in the Team page (and reusable elsewhere).
- *
+ * KPI Card Component
+ * 
+ * Generic card for displaying key performance indicators with icon badges and optional children.
+ * Uses centralized design system classes for consistency across dashboards.
+ * 
  * Layout:
  *   ┌──────────────────────────┐
  *   │ label           [icon]   │
  *   │ BIG VALUE                │
  *   │ {children: chart/note}   │
  *   └──────────────────────────┘
+ * 
+ * @example
+ * <KpiCard 
+ *   label="Completed Tasks"
+ *   value="24"
+ *   icon={CheckIcon}
+ *   tone="success"
+ * >
+ *   <p>3 more than last week</p>
+ * </KpiCard>
  */
 function KpiCard({ label, value, icon: Icon, tone = 'brand', children }: KpiCardProps) {
   return (
-    <div
-      className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col
-                 shadow-sm shadow-gray-200/60 hover:shadow-md hover:-translate-y-0.5
-                 transition-all duration-200"
-    >
+    <div className="card-interactive">
       <div className="flex items-start justify-between gap-3">
         <span className="text-sm text-gray-500">{label}</span>
-        <span
-          className={`flex items-center justify-center h-10 w-10 rounded-lg shrink-0
-                      ${TONE_CLASSES[tone]}`}
-          aria-hidden="true"
-        >
+        <span className={TONE_TO_ICON_CLASS[tone]} aria-hidden="true">
           <Icon className="h-5 w-5" />
         </span>
       </div>

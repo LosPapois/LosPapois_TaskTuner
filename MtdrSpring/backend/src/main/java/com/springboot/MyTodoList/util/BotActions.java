@@ -273,10 +273,6 @@ public class BotActions {
                                 .build()))
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
-                                .text("✅ Complete Task")
-                                .callbackData(BotCommands.MARK_DONE.getCommand())
-                                .build(),
-                        InlineKeyboardButton.builder()
                                 .text("↩️ Reopen Task")
                                 .callbackData(BotCommands.MARK_UNDO.getCommand())
                                 .build()))
@@ -334,8 +330,7 @@ public class BotActions {
         }
 
         String cmd = requestText.trim();
-        if (!cmd.equals(BotCommands.MARK_UNDO.getCommand())
-                && !cmd.equals(BotCommands.MARK_REWORK.getCommand()))
+        if (!cmd.equals(BotCommands.MARK_UNDO.getCommand()))
             return;
 
         UserTT user = getAuthenticatedUser();
@@ -1212,100 +1207,137 @@ public class BotActions {
 
     // ─── Other actions ───────────────────────────────────────────────────
 
+    private static final int TASK_PAGE_SIZE = 10;
+
     public void fnListAll() {
-        if (exit)
-            return;
+        if (exit) return;
         if (!isUserAuthenticated()) {
             BotHelper.sendMessageToTelegram(chatId, "❌ You must log in first. Use /login", telegramClient, null);
             exit = true;
             return;
         }
 
-        if (!(requestText.equals(BotCommands.TODO_LIST.getCommand())
+        boolean isEntry = requestText.equals(BotCommands.TODO_LIST.getCommand())
                 || requestText.equals(BotLabels.LIST_ALL_ITEMS.getLabel())
-                || requestText.equals(BotLabels.MY_TODO_LIST.getLabel())))
-            return;
+                || requestText.equals(BotLabels.MY_TODO_LIST.getLabel());
+        boolean isPage  = requestText.startsWith("TASK_PAGE:");
+
+        if (!isEntry && !isPage) return;
+
+        int page = 0;
+        if (isPage) {
+            try { page = Integer.parseInt(requestText.substring(10)); }
+            catch (NumberFormatException ignored) {}
+        }
 
         UserTT me = getAuthenticatedUser();
-
-        // Only my tasks in the active sprint
-        List<TaskTT> myTasks = taskTTService.getTasksByUserInActiveSprint(me.getUserId());
-
-        List<TaskTT> myPending = myTasks.stream()
-                .filter(t -> t.getDateEndRealTask() == null).collect(Collectors.toList());
-        List<TaskTT> myDone = myTasks.stream()
-                .filter(t -> t.getDateEndRealTask() != null).collect(Collectors.toList());
-
-        // Group pending tasks by featureId — only features I have tasks in
-        Map<Long, List<TaskTT>> byFeature = myPending.stream()
-                .filter(t -> t.getFeatureId() != null)
-                .collect(Collectors.groupingBy(TaskTT::getFeatureId));
-
-        List<TaskTT> noFeaturePending = myPending.stream()
-                .filter(t -> t.getFeatureId() == null)
+        List<TaskTT> pending = taskTTService.getTasksByUserInActiveSprint(me.getUserId()).stream()
+                .filter(t -> t.getDateEndRealTask() == null)
                 .collect(Collectors.toList());
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("📋 *My Tasks — Active Sprint*\n\n");
-
-        if (myTasks.isEmpty()) {
-            sb.append("You have no tasks in the active sprint.");
-            BotHelper.sendMessageToTelegram(chatId, sb.toString(), telegramClient, null);
+        if (pending.isEmpty()) {
+            BotHelper.sendMessageToTelegram(chatId, "✅ You have no pending tasks in the active sprint.", telegramClient, null);
             showMainMenu();
             exit = true;
             return;
         }
 
-        // ── Features where I have tasks ───────────────────────────────────────
-        if (!byFeature.isEmpty()) {
-            // Sort features by priority
-            List<Long> sortedFeatureIds = byFeature.keySet().stream()
-                    .sorted(Comparator.comparingInt(fid -> {
-                        FeatureTT f = featureTTService.getFeatureById(fid).orElse(null);
-                        return f != null ? priorityOrder(f.getPriorityFeature()) : 99;
-                    }))
-                    .collect(Collectors.toList());
+        int total = pending.size();
+        int totalPages = (int) Math.ceil((double) total / TASK_PAGE_SIZE);
+        page = Math.max(0, Math.min(page, totalPages - 1));
 
-            for (Long featureId : sortedFeatureIds) {
-                FeatureTT feature = featureTTService.getFeatureById(featureId).orElse(null);
-                if (feature == null)
-                    continue;
+        int from = page * TASK_PAGE_SIZE;
+        int to   = Math.min(from + TASK_PAGE_SIZE, total);
+        List<TaskTT> pageItems = pending.subList(from, to);
 
-                sb.append("🗂 *").append(feature.getNameFeature()).append("*\n");
+        String header = String.format("📋 *My Tasks* (%d–%d of %d) — tap a task for details:", from + 1, to, total);
 
-                for (TaskTT t : byFeature.get(featureId)) {
-                    sb.append("  ").append(prioEmoji(t.getPriority()))
-                            .append(" ").append(t.getNameTask())
-                            .append(" — ").append(t.getStoryPoints()).append(" SP")
-                            .append(" | Due: ").append(t.getDateEndSetTask()).append("\n");
-                }
-                sb.append("\n");
-            }
+        var builder = InlineKeyboardMarkup.builder();
+        for (TaskTT t : pageItems) {
+            String label = prioEmoji(t.getPriority()) + " " + t.getNameTask()
+                    + " (" + t.getStoryPoints() + " SP)";
+            builder.keyboardRow(new InlineKeyboardRow(
+                    InlineKeyboardButton.builder()
+                            .text(label)
+                            .callbackData("TASK_DETAIL:" + t.getTaskId() + ":" + page)
+                            .build()));
         }
 
-        // ── No feature ────────────────────────────────────────────────────────
-        if (!noFeaturePending.isEmpty()) {
-            sb.append("🔹 *No feature*\n");
-            for (TaskTT t : noFeaturePending) {
-                sb.append("  ").append(prioEmoji(t.getPriority()))
-                        .append(" ").append(t.getNameTask())
-                        .append(" — ").append(t.getStoryPoints()).append(" SP")
-                        .append(" | Due: ").append(t.getDateEndSetTask()).append("\n");
-            }
-            sb.append("\n");
+        // Pagination row
+        List<InlineKeyboardButton> navRow = new ArrayList<>();
+        if (page > 0)
+            navRow.add(InlineKeyboardButton.builder().text("◀ Prev").callbackData("TASK_PAGE:" + (page - 1)).build());
+        if (page < totalPages - 1)
+            navRow.add(InlineKeyboardButton.builder().text("Next ▶").callbackData("TASK_PAGE:" + (page + 1)).build());
+        if (!navRow.isEmpty())
+            builder.keyboardRow(new InlineKeyboardRow(navRow));
+
+        builder.keyboardRow(new InlineKeyboardRow(
+                InlineKeyboardButton.builder().text("🚪 Exit").callbackData("CANCEL").build()));
+
+        BotHelper.sendMessageToTelegramButtons(chatId, header, telegramClient, builder.build());
+        exit = true;
+    }
+
+    public void fnTaskDetail() {
+        if (exit) return;
+        if (!requestText.startsWith("TASK_DETAIL:")) return;
+        if (!isUserAuthenticated()) { exit = true; return; }
+
+        String[] parts = requestText.split(":");
+        if (parts.length < 3) { exit = true; return; }
+
+        long taskId;
+        int page;
+        try {
+            taskId = Long.parseLong(parts[1]);
+            page   = Integer.parseInt(parts[2]);
+        } catch (NumberFormatException e) { exit = true; return; }
+
+        TaskTT t = taskTTService.getTaskById(taskId).orElse(null);
+        if (t == null) {
+            BotHelper.sendMessageToTelegram(chatId, "❌ Task not found.", telegramClient, null);
+            exit = true;
+            return;
         }
 
-        // ── Completed ─────────────────────────────────────────────────────────
-        if (!myDone.isEmpty()) {
-            sb.append("✅ *Completed*\n");
-            for (TaskTT t : myDone) {
-                sb.append("• ").append(t.getNameTask())
-                        .append(" — delivered: ").append(t.getDateEndRealTask()).append("\n");
-            }
-        }
+        String featureName = t.getFeatureId() != null
+                ? featureTTService.getFeatureById(t.getFeatureId())
+                        .map(FeatureTT::getNameFeature).orElse("Unknown")
+                : "No feature";
 
-        BotHelper.sendMessageToTelegram(chatId, sb.toString(), telegramClient, null);
-        showMainMenu();
+        String detail = String.format(
+                "📌 *%s*\n\n" +
+                "📝 %s\n\n" +
+                "⚡ Priority: *%s*\n" +
+                "🎯 Story Points: *%d SP*\n" +
+                "🗂 Feature: *%s*\n" +
+                "📅 Due: *%s*",
+                t.getNameTask(),
+                t.getInfoTask() != null && !t.getInfoTask().isBlank() ? t.getInfoTask() : "_No description_",
+                t.getPriority() != null ? t.getPriority().toUpperCase() : "—",
+                t.getStoryPoints() != null ? t.getStoryPoints() : 0,
+                featureName,
+                t.getDateEndSetTask() != null ? t.getDateEndSetTask().toString() : "—"
+        );
+
+        InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                                .text("◀ Volver")
+                                .callbackData("TASK_PAGE:" + page)
+                                .build(),
+                        InlineKeyboardButton.builder()
+                                .text("✅ Done")
+                                .callbackData("DONE_TASK:" + taskId)
+                                .build(),
+                        InlineKeyboardButton.builder()
+                                .text("🚪 Exit")
+                                .callbackData("CANCEL")
+                                .build()))
+                .build();
+
+        BotHelper.sendMessageToTelegramButtons(chatId, detail, telegramClient, keyboard);
         exit = true;
     }
 

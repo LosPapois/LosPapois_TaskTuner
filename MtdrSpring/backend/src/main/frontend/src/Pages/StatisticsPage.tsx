@@ -460,7 +460,7 @@ export default function StatisticsPage() {
   if (loading) {
     return (
       <div className="bg-gray-50 min-h-full px-6 py-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="container-main">
           <PageLoading
             title="Loading project statistics..."
             subtitle="Fetching project members, sprint history, and completion metrics."
@@ -472,9 +472,9 @@ export default function StatisticsPage() {
 
   return (
     <div className="bg-gray-50 min-h-full px-6 py-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="container-main space-y-8">
         <header>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="heading-h2">
             {projectName} - Statistics
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -487,12 +487,11 @@ export default function StatisticsPage() {
           
           {/* Left Column: Bar Graph and Controls */}
           <section
-            className="flex flex-col bg-white border border-gray-200 rounded-xl p-6 space-y-6 shadow-sm shadow-gray-200/60 min-w-0"
+            className="section-card-flex space-y-6"
             aria-labelledby="statistics-controls-heading"
           >
             <div className="flex flex-col space-y-2">
-              <h2 id="statistics-controls-heading" className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                <span className="h-5 w-1 bg-brand rounded-full" aria-hidden="true" />
+              <h2 id="statistics-controls-heading" className="heading-h4">
                 Bar Graph by Sprint
               </h2>
               <p className="text-sm text-gray-500">

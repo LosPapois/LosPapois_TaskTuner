@@ -760,17 +760,17 @@ export default function TeamPage() {
       />
 
       {isPageLoading ? (
-        <div className="max-w-7xl mx-auto">
+        <div className="container-main">
           <PageLoading
             title="Loading project team..."
             subtitle="Fetching members, tasks, and features to render the full view."
           />
         </div>
       ) : (
-        <div className="max-w-7xl mx-auto space-y-8">
+        <div className="container-main space-y-8">
           {/* Page header */}
           <header>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="heading-h2">
               {projectName} - Team
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -894,15 +894,13 @@ export default function TeamPage() {
           {/* Members section */}
           <section
             aria-labelledby="members-heading"
-            className="bg-white border border-gray-200 rounded-xl p-6
-                     shadow-sm shadow-gray-200/60"
+            className="section-card"
           >
             <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
               <h2
                 id="members-heading"
-                className="flex items-center gap-3 text-xl font-bold text-gray-800"
+                className="heading-h4"
               >
-                <span className="h-5 w-1 bg-brand rounded-full" aria-hidden="true" />
                 Team Members
               </h2>
 

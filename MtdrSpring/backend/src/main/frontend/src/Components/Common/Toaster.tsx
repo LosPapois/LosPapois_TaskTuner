@@ -5,63 +5,78 @@ import { subscribeToast, ToastItem } from '../../Utils/toast';
 
 const AUTO_DISMISS_MS = 3500;
 
-const STYLES: Record<ToastItem['type'], { bar: string; icon: string; text: string; bg: string }> = {
+/**
+ * Toast styling configuration using design system classes
+ * Maps toast types to their corresponding badge and icon classes from globals.css
+ */
+const TOAST_STYLES: Record<ToastItem['type'], { badge: string; icon: string; text: string; bg: string; bar: string }> = {
   success: {
-    bar:  'bg-brand',
+    badge: 'icon-badge-success',
     icon: 'text-brand',
     text: 'text-gray-800',
-    bg:   'bg-white',
+    bg: 'bg-white',
+    bar: 'bg-brand',
   },
   error: {
-    bar:  'bg-red-500',
+    badge: 'icon-badge-danger',
     icon: 'text-red-500',
     text: 'text-gray-800',
-    bg:   'bg-white',
+    bg: 'bg-white',
+    bar: 'bg-red-500',
   },
   info: {
-    bar:  'bg-blue-500',
+    badge: 'icon-badge-info',
     icon: 'text-blue-500',
     text: 'text-gray-800',
-    bg:   'bg-white',
+    bg: 'bg-white',
+    bar: 'bg-blue-500',
   },
 };
 
 const ICONS: Record<ToastItem['type'], React.ElementType> = {
   success: CheckCircleIcon,
-  error:   ExclamationCircleIcon,
-  info:    InformationCircleIcon,
+  error: ExclamationCircleIcon,
+  info: InformationCircleIcon,
 };
 
 interface ActiveToast extends ToastItem {
   exiting: boolean;
 }
 
+/**
+ * Toast Card - Individual notification element
+ * 
+ * Uses design system classes for consistent styling:
+ * - toast-card: base card styles
+ * - toast-bar: colored left accent bar
+ * - btn-icon-light: dismiss button
+ */
 function ToastCard({ item, onRemove }: { item: ActiveToast; onRemove: (id: number) => void }) {
-  const s = STYLES[item.type];
+  const style = TOAST_STYLES[item.type];
   const Icon = ICONS[item.type];
 
   return (
     <div
-      className={`
-        relative flex items-start gap-3 w-80 rounded-xl shadow-lg border border-gray-100
-        px-4 py-3 ${s.bg}
-        transition-all duration-300 ease-in-out
+      className={`toast-card ${style.bg}
         ${item.exiting ? 'opacity-0 translate-x-4' : 'opacity-100 translate-x-0'}
       `}
       role="alert"
     >
       {/* Left accent bar */}
-      <span className={`absolute left-0 top-2 bottom-2 w-1 rounded-full ${s.bar}`} />
+      <span className={`toast-bar ${style.bar}`} />
 
-      <Icon className={`size-5 shrink-0 mt-0.5 ${s.icon}`} />
+      {/* Icon */}
+      <Icon className={`size-5 shrink-0 mt-0.5 ${style.icon}`} />
 
-      <p className={`flex-1 text-sm font-medium leading-snug ${s.text}`}>
+      {/* Message text */}
+      <p className={`toast-text ${style.text}`}>
         {item.message}
       </p>
 
+      {/* Dismiss button */}
       <button
         onClick={() => onRemove(item.id)}
-        className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+        className="btn-icon-light shrink-0"
         aria-label="Dismiss"
       >
         <XMarkIcon className="size-4" />
@@ -70,6 +85,14 @@ function ToastCard({ item, onRemove }: { item: ActiveToast; onRemove: (id: numbe
   );
 }
 
+/**
+ * Toaster Component - Global notification system
+ * 
+ * Subscribes to toast events and renders notifications in a fixed container.
+ * Uses design system classes for consistent appearance across the app.
+ * 
+ * Implements auto-dismiss with configurable timeout and smooth exit animation.
+ */
 export default function Toaster() {
   const [toasts, setToasts] = useState<ActiveToast[]>([]);
 
@@ -100,11 +123,7 @@ export default function Toaster() {
   if (toasts.length === 0) return null;
 
   return createPortal(
-    <div
-      aria-live="polite"
-      aria-atomic="false"
-      className="fixed bottom-5 right-5 z-[99999] flex flex-col gap-2 items-end"
-    >
+    <div className="toast-container">
       {toasts.map(t => (
         <ToastCard key={t.id} item={t} onRemove={remove} />
       ))}
