@@ -7,6 +7,11 @@ interface ProjectDTO {
   namePj: string;
 }
 
+interface SprintLite {
+  id: number;
+  name: string;
+}
+
 interface Crumb {
   label: string;
   /** When true the crumb is rendered as the current page (bolder, darker). */
@@ -22,6 +27,12 @@ function buildCrumbs(pathname: string): Crumb[] {
   const projects = getFromStorage<ProjectDTO[]>(STORAGE_KEYS.PROJECTS) ?? [];
   const findProject = (id: number) =>
     projects.find(p => p.pjId === id)?.namePj ?? 'Project';
+
+  const findSprint = (projectId: number, sprintId: number) => {
+    const cacheKey = `${STORAGE_KEYS.SPRINTS}_${projectId}`;
+    const sprints = getFromStorage<SprintLite[]>(cacheKey) ?? [];
+    return sprints.find(s => s.id === sprintId)?.name ?? `Sprint ${sprintId}`;
+  };
 
   // Static top-level routes
   const staticMap: Record<string, string> = {
@@ -62,7 +73,7 @@ function buildCrumbs(pathname: string): Crumb[] {
     const sid = Number(sprintMatch[2]);
     return [
       { label: findProject(pid) },
-      { label: `Sprint ${sid}`, current: true },
+      { label: findSprint(pid, sid), current: true },
     ];
   }
 

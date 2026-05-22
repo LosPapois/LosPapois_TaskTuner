@@ -33,4 +33,8 @@ public interface FeatureTTRepository extends JpaRepository<FeatureTT, Long> {
            "  WHERE t.userId = :userId AND s.stateSprint = 'active'" +
            ")")
     List<FeatureTT> findFeaturesInActiveSprintForUser(@Param("userId") long userId);
+
+    @Query("SELECT f FROM FeatureTT f JOIN SprintTT s ON f.sprId = s.sprId " +
+           "WHERE s.pjId = :pjId ORDER BY s.dateStartSpr, f.priorityFeature")
+    List<FeatureTT> findAllByProjectId(@Param("pjId") long pjId);
 }

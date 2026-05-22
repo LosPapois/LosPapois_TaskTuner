@@ -2,12 +2,13 @@ import React from 'react';
 
 export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
-const TONE_CLASSES: Record<StatusTone, string> = {
-  success: 'bg-green-100 text-green-700',
-  warning: 'bg-orange-100 text-orange-700',
-  danger:  'bg-red-100 text-red-700',
-  info:    'bg-blue-100 text-blue-700',
-  neutral: 'bg-gray-100 text-gray-600',
+/** Mapping of tones to global design system badge classes (from globals.css) */
+const TONE_TO_CLASS: Record<StatusTone, string> = {
+  success: 'badge-success',
+  warning: 'badge-warning',
+  danger: 'badge-danger',
+  info: 'badge-info',
+  neutral: 'badge-neutral',
 };
 
 export interface StatusBadgeProps {
@@ -15,13 +16,19 @@ export interface StatusBadgeProps {
   tone?: StatusTone;
 }
 
-/** Small rounded pill used for feature/task statuses. */
+/**
+ * Status Badge Component
+ * 
+ * Renders a small pill-shaped badge with semantic coloring.
+ * Uses centralized design system classes to ensure consistency.
+ * 
+ * @example
+ * <StatusBadge label="Completed" tone="success" />
+ * <StatusBadge label="In Progress" tone="warning" />
+ */
 function StatusBadge({ label, tone = 'neutral' }: StatusBadgeProps) {
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                  ${TONE_CLASSES[tone]}`}
-    >
+    <span className={TONE_TO_CLASS[tone]}>
       {label}
     </span>
   );
