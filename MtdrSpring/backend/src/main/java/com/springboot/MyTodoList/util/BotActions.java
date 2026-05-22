@@ -278,10 +278,6 @@ public class BotActions {
                                 .build()))
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
-                                .text("✏️ Edit Task")
-                                .callbackData(BotCommands.EDIT_TASK.getCommand())
-                                .build(),
-                        InlineKeyboardButton.builder()
                                 .text("✏️ Edit Feature")
                                 .callbackData(BotCommands.EDIT_FEATURE.getCommand())
                                 .build()))
@@ -1324,20 +1320,20 @@ public class BotActions {
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
-                                .text("◀ Volver")
-                                .callbackData("TASK_PAGE:" + page)
-                                .build(),
-                        InlineKeyboardButton.builder()
                                 .text("✅ Done")
                                 .callbackData("DONE_TASK:" + taskId)
-                                .build()))
-                .keyboardRow(new InlineKeyboardRow(
+                                .build(),
                         InlineKeyboardButton.builder()
                                 .text("✏️ Edit")
                                 .callbackData("EDIT_PICK:" + taskId)
+                                .build()))
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                                .text("◀ Back")
+                                .callbackData("TASK_PAGE:" + page)
                                 .build(),
                         InlineKeyboardButton.builder()
-                                .text("🚪 Exit")
+                                .text("❌ Cancel")
                                 .callbackData("CANCEL")
                                 .build()))
                 .build();
