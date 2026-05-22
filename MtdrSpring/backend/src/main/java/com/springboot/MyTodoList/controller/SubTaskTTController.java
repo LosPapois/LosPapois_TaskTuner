@@ -3,7 +3,6 @@ package com.springboot.MyTodoList.controller;
 import com.springboot.MyTodoList.model.SubTaskTT;
 import com.springboot.MyTodoList.service.SubTaskTTService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,78 +17,45 @@ public class SubTaskTTController {
     @Autowired
     private SubTaskTTService subTaskTTService;
 
-    @GetMapping(value = "/subtasks")
+    @GetMapping("/subtasks")
     public List<SubTaskTT> getAllSubTasks() {
         return subTaskTTService.findAll();
     }
 
-    @GetMapping(value = "/subtasks/{id}")
+    @GetMapping("/subtasks/{id}")
     public ResponseEntity<SubTaskTT> getSubTaskById(@PathVariable long id) {
-        try {
-            return subTaskTTService.getSubTaskById(id);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        return ControllerHelper.okOrNotFound(subTaskTTService.getSubTaskById(id));
     }
 
-    @GetMapping(value = "/tasks/{taskId}/subtasks")
+    @GetMapping("/tasks/{taskId}/subtasks")
     public List<SubTaskTT> getSubTasksByTask(@PathVariable long taskId) {
         return subTaskTTService.getSubTasksByTask(taskId);
     }
 
-    @GetMapping(value = "/tasks/{taskId}/progress")
+    @GetMapping("/tasks/{taskId}/progress")
     public ResponseEntity<Map<String, Object>> getTaskProgress(@PathVariable long taskId) {
-        try {
-            Map<String, Object> progress = subTaskTTService.getTaskProgress(taskId);
-            return new ResponseEntity<>(progress, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(subTaskTTService.getTaskProgress(taskId), HttpStatus.OK);
     }
 
-    @PostMapping(value = "/subtasks")
-    public ResponseEntity<SubTaskTT> addSubTask(@RequestBody SubTaskTT subTask) throws Exception {
+    @PostMapping("/subtasks")
+    public ResponseEntity<SubTaskTT> addSubTask(@RequestBody SubTaskTT subTask) {
         SubTaskTT saved = subTaskTTService.addSubTask(subTask);
-        HttpHeaders responseHeaders = new HttpHeaders();
-        responseHeaders.set("location", "" + saved.getSubId());
-        responseHeaders.set("Access-Control-Expose-Headers", "location");
-        return ResponseEntity.ok().headers(responseHeaders).build();
+        return ControllerHelper.created(saved, saved.getSubId());
     }
 
-    @PostMapping(value = "/tasks/{taskId}/subtasks/quick")
+    @PostMapping("/tasks/{taskId}/subtasks/quick")
     public ResponseEntity<SubTaskTT> addQuickSubTask(@PathVariable long taskId, @RequestParam String name) {
-        try {
-            SubTaskTT saved = subTaskTTService.addQuickSubTask(taskId, name);
-            HttpHeaders responseHeaders = new HttpHeaders();
-            responseHeaders.set("location", "" + saved.getSubId());
-            responseHeaders.set("Access-Control-Expose-Headers", "location");
-            return ResponseEntity.ok().headers(responseHeaders).build();
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        SubTaskTT saved = subTaskTTService.addQuickSubTask(taskId, name);
+        return ControllerHelper.created(saved, saved.getSubId());
     }
 
-    @PutMapping(value = "/subtasks/{id}")
+    @PutMapping("/subtasks/{id}")
     public ResponseEntity<SubTaskTT> updateSubTask(@RequestBody SubTaskTT subTask, @PathVariable long id) {
-        try {
-            SubTaskTT updated = subTaskTTService.updateSubTask(id, subTask);
-            if (updated == null) {
-                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(updated, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-        }
+        return ControllerHelper.okOrNotFound(subTaskTTService.updateSubTask(id, subTask));
     }
 
-    @DeleteMapping(value = "/subtasks/{id}")
-    public ResponseEntity<Boolean> deleteSubTask(@PathVariable("id") long id) {
-        Boolean flag = false;
-        try {
-            flag = subTaskTTService.deleteSubTask(id);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
-        }
+    @DeleteMapping("/subtasks/{id}")
+    public ResponseEntity<Boolean> deleteSubTask(@PathVariable long id) {
+        return ControllerHelper.deleted(subTaskTTService.deleteSubTask(id));
     }
 }

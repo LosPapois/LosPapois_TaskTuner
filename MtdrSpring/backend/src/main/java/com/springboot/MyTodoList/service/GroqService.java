@@ -36,6 +36,7 @@ public class GroqService {
     private static final Logger logger = LoggerFactory.getLogger(GroqService.class);
     private static final String MODEL = "llama-3.3-70b-versatile";
     private static final int MAX_USER_INPUT_LENGTH = 400;
+    private static final int MAX_BULK_INPUT_LENGTH = 5000;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     // Each pattern targets a well-known prompt injection technique.
@@ -102,6 +103,73 @@ public class GroqService {
     }
 
     /**
+     * Sanitize bulk document text for task extraction.
+     * Keeps newlines (needed for list/section detection) but still strips injection patterns.
+     * Returns null if blank after sanitization.
+     */
+    public String sanitizeBulk(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+
+        String s = raw.trim();
+        if (s.length() > MAX_BULK_INPUT_LENGTH) {
+            s = s.substring(0, MAX_BULK_INPUT_LENGTH);
+        }
+
+        // Strip injection patterns — same security layer as sanitize()
+        for (Pattern p : INJECTION_PATTERNS) {
+            s = p.matcher(s).replaceAll("[removed]");
+        }
+
+        return s.isBlank() ? null : s;
+    }
+
+    /**
+     * Send a bulk chat completion request to Groq for document/text analysis.
+     * Uses higher token limits than ask() to handle larger documents.
+     *
+     * @param systemPrompt  Server-built extraction instructions.
+     * @param documentText  Already sanitized document content.
+     * @return Model response text (expected to be a JSON array).
+     */
+    public String askBulk(String systemPrompt, String documentText) throws IOException {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", MODEL);
+        body.put("max_tokens", 1500);
+        body.put("temperature", 0.2);
+
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt));
+        messages.add(Map.of("role", "user",   "content", documentText));
+        body.put("messages", messages);
+
+        HttpPost post = new HttpPost(apiUrl);
+        post.addHeader("Content-Type",  "application/json");
+        post.addHeader("Authorization", "Bearer " + apiKey);
+        post.setEntity(new StringEntity(
+            MAPPER.writeValueAsString(body), StandardCharsets.UTF_8));
+
+        String raw = httpClient.execute(post, response -> {
+            try {
+                return EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+            } catch (org.apache.hc.core5.http.ParseException e) {
+                throw new IOException("Failed to parse Groq response body", e);
+            }
+        });
+
+        logger.debug("Groq bulk raw response: {}", raw);
+
+        JsonNode root    = MAPPER.readTree(raw);
+        JsonNode content = root.path("choices").path(0).path("message").path("content");
+        if (!content.isMissingNode()) {
+            return content.asText();
+        }
+        JsonNode errMsg = root.path("error").path("message");
+        return errMsg.isMissingNode()
+            ? "No response received from the AI."
+            : "AI error: " + errMsg.asText();
+    }
+
+    /**
      * Send a chat completion request to Groq.
      *
      * @param systemPrompt  Server-built context + rules. Never contains user text.
@@ -111,7 +179,7 @@ public class GroqService {
     public String ask(String systemPrompt, String userQuestion) throws IOException {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", MODEL);
-        body.put("max_tokens", 400);
+        body.put("max_tokens", 700);
         body.put("temperature", 0.3);
 
         List<Map<String, String>> messages = new ArrayList<>();

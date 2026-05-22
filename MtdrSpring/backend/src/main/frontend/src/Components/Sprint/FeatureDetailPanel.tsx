@@ -1,5 +1,10 @@
 import React from 'react';
-import { ChevronRightIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import {
+  ChevronRightIcon,
+  DocumentTextIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline';
 
 export type PriorityTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
@@ -130,6 +135,17 @@ function Stat({
 export interface FeatureDetailPanelProps {
   feature: FeatureDetailData;
   onTaskClick?: (taskId: number) => void;
+  /**
+   * When provided, an "Edit Feature" button is shown next to the title.
+   * Receives the feature's id; parent opens its own edit form.
+   */
+  onEdit?: (featureId: number) => void;
+  /**
+   * When provided, a "Delete Feature" button is shown next to the title.
+   * Receives the feature's id; parent should open a confirmation modal
+   * before actually deleting.
+   */
+  onDelete?: (featureId: number) => void;
 }
 
 /**
@@ -138,14 +154,43 @@ export interface FeatureDetailPanelProps {
  *   - Stats block (developer / SPs / priority / progress) + progress bar
  *   - "Linked Tasks" list (or empty state)
  */
-function FeatureDetailPanel({ feature, onTaskClick }: FeatureDetailPanelProps) {
+function FeatureDetailPanel({ feature, onTaskClick, onEdit, onDelete }: FeatureDetailPanelProps) {
   const priorityClass =
     PRIORITY_TEXT[feature.priorityTone ?? 'neutral'] ?? PRIORITY_TEXT.neutral;
   const safeProgress = Math.max(0, Math.min(feature.progress, 100));
 
   return (
     <div className="space-y-5">
-      <h3 className="text-2xl font-bold text-gray-800">{feature.name}</h3>
+      {/* Title row — edit + delete actions sit to the right when allowed */}
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-2xl font-bold text-gray-800">{feature.name}</h3>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(feature.id)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold
+                         text-white bg-brand rounded-lg hover:bg-brand-dark
+                         transition-colors shadow-sm"
+            >
+              <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
+              Edit Feature
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(feature.id)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold
+                         text-red-600 bg-white border border-red-300 rounded-lg
+                         hover:bg-red-50 transition-colors shadow-sm"
+            >
+              <TrashIcon className="w-4 h-4" aria-hidden="true" />
+              Delete Feature
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Description callout */}
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4">

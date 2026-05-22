@@ -1,17 +1,21 @@
 package com.springboot.MyTodoList.service;
 
-import com.springboot.MyTodoList.model.SprintMetricsResult;
-import com.springboot.MyTodoList.model.SprintTT;
-import com.springboot.MyTodoList.repository.SprintTaskTTRepository;
-import com.springboot.MyTodoList.repository.SprintTTRepository;
-import com.springboot.MyTodoList.repository.TaskTTRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.springboot.MyTodoList.model.ProjectTT;
+import com.springboot.MyTodoList.model.SprintMetricsResult;
+import com.springboot.MyTodoList.model.SprintTT;
+import com.springboot.MyTodoList.model.SprintTaskTT;
+import com.springboot.MyTodoList.repository.ProjectTTRepository;
+import com.springboot.MyTodoList.repository.SprintTTRepository;
+import com.springboot.MyTodoList.repository.SprintTaskTTRepository;
+import com.springboot.MyTodoList.repository.TaskTTRepository;
 
 /*
  * ============================================================
@@ -48,6 +52,9 @@ public class SprintTTService {
     @Autowired
     private SprintTTRepository sprintTTRepository;
 
+    @Autowired
+    private ProjectTTRepository projectTTRepository;
+
     /**
      * Repository for TASK_TT — used in getSprintMetrics() to sum story_points
      * via the custom @Query: sumStoryPointsBySprint(sprId).
@@ -74,42 +81,45 @@ public class SprintTTService {
     /**
      * Returns a single sprint by its primary key.
      *
-     * @param id  the spr_id to look up
-     * @return 200 OK with sprint, or 404 NOT FOUND
+     * @param id the spr_id to look up
+     * @return Optional containing the sprint if found
      */
-    public ResponseEntity<SprintTT> getSprintById(long id) {
-        Optional<SprintTT> found = sprintTTRepository.findById(id);
-        if (found.isPresent()) {
-            return new ResponseEntity<>(found.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Optional<SprintTT> getSprintById(long id) {
+        return sprintTTRepository.findById(id);
     }
 
     /**
      * Returns all sprints for a given project (sprint history).
      *
-     * @param pjId  the project whose sprint history to retrieve
+     * @param pjId the project whose sprint history to retrieve
      */
     public List<SprintTT> getSprintsByProject(long pjId) {
         return sprintTTRepository.findByPjId(pjId);
     }
 
     /**
-     * Returns the currently active sprint for a project.
-     * Wraps the Optional in ResponseEntity so the controller can
-     * return 404 if no sprint is currently active.
-     *
-     * @param pjId  the project to query
-     * @return 200 with the active sprint, or 404 if no active sprint
+     * Finds sprints for a project matching active/done states,
+     * ensuring we exclude any "future" sprints that might have been
+     * accidentally created with an active state but haven't started yet.
      */
-    public ResponseEntity<SprintTT> getActiveSprintForProject(long pjId) {
-        Optional<SprintTT> activeSprint = sprintTTRepository.findByPjIdAndStateSprint(pjId, "active");
-        if (activeSprint.isPresent()) {
-            return new ResponseEntity<>(activeSprint.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public List<SprintTT> getActiveAndDoneSprintsByProject(long pjId) {
+        List<SprintTT> sprints = sprintTTRepository.findByPjIdAndStateSprintIn(pjId,
+                java.util.Arrays.asList("active", "done"));
+        java.time.LocalDate today = java.time.LocalDate.now();
+
+        return sprints.stream()
+                .filter(s -> s.getDateStartSpr() != null && !s.getDateStartSpr().isAfter(today))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * Returns the currently active sprint for a project.
+     *
+     * @param pjId the project to query
+     * @return Optional containing the active sprint if it exists
+     */
+    public Optional<SprintTT> getActiveSprintForProject(long pjId) {
+        return sprintTTRepository.findByPjIdAndStateSprint(pjId, "active");
     }
 
     // ─── Write Operations ─────────────────────────────────────────────────
@@ -117,18 +127,21 @@ public class SprintTTService {
     /**
      * Creates a new sprint.
      *
-     * @param newSprint  the SprintTT to insert (sprId should be 0 for new records)
+     * @param newSprint the SprintTT to insert (sprId should be 0 for new records)
      * @return the saved entity with the DB-assigned sprId
      */
     public SprintTT addSprint(SprintTT newSprint) {
+        if (newSprint.getPjId() == 0) {
+            throw new IllegalArgumentException("Sprint must belong to a project (pjId is required).");
+        }
         return sprintTTRepository.save(newSprint);
     }
 
     /**
      * Updates an existing sprint's mutable fields.
      *
-     * @param id             the spr_id to update
-     * @param updatedSprint  object carrying the new values
+     * @param id            the spr_id to update
+     * @param updatedSprint object carrying the new values
      * @return the saved SprintTT, or null if not found
      */
     public SprintTT updateSprint(long id, SprintTT updatedSprint) {
@@ -150,7 +163,7 @@ public class SprintTTService {
      * Deletes a sprint by its primary key.
      * ON DELETE CASCADE on sprint_task_tt removes all linked task entries.
      *
-     * @param id  the spr_id to delete
+     * @param id the spr_id to delete
      * @return true if deleted, false on exception
      */
     public boolean deleteSprint(long id) {
@@ -162,6 +175,99 @@ public class SprintTTService {
         }
     }
 
+    /**
+     * Closes a sprint (marks it 'done') and, if the project has autoRollover
+     * enabled, copies all incomplete tasks to the target next sprint.
+     *
+     * Rollover: any task with stateTask 'active' or 'delayed' in this sprint
+     * is inserted into nextSprintId with stateTask = 'active'.
+     *
+     * @param sprId         the sprint to close
+     * @param nextSprintId  the sprint to receive rolled-over tasks (nullable — no rollover if null)
+     * @return the updated sprint, or null if not found
+     */
+    @Transactional
+    public SprintTT closeSprint(long sprId, Long nextSprintId) {
+        Optional<SprintTT> existing = sprintTTRepository.findById(sprId);
+        if (!existing.isPresent()) return null;
+
+        SprintTT sprint = existing.get();
+        sprint.setStateSprint("done");
+        sprintTTRepository.save(sprint);
+
+        if (nextSprintId != null) {
+            Optional<ProjectTT> projectOpt = projectTTRepository.findById(sprint.getPjId());
+            if (projectOpt.isPresent() && projectOpt.get().isAutoRollover()) {
+                rolloverTasks(sprId, nextSprintId);
+            }
+        }
+
+        return sprint;
+    }
+
+    /**
+     * Closes a sprint and activates the closest candidate sprint.
+     *
+     * Algorithm:
+     *   1. Mark this sprint as 'done'.
+     *   2. Find all non-done sprints for the same project (excluding itself).
+     *   3. Pick the one whose dateStartSpr is closest to this sprint's dateEndSpr
+     *      using MIN(|dateStart_candidate - dateEnd_closed|). Sprints with no
+     *      start date are given lowest priority (treated as Infinity distance).
+     *   4. Mark that sprint as 'active'.
+     *   5. If project has autoRollover, copy incomplete tasks to the new sprint.
+     *
+     * @param sprId  the sprint to close
+     * @return the newly activated sprint, or null if sprId not found
+     */
+    @Transactional
+    public SprintTT closeSprintAndActivateNext(long sprId) {
+        Optional<SprintTT> existing = sprintTTRepository.findById(sprId);
+        if (!existing.isPresent()) return null;
+
+        SprintTT sprint = existing.get();
+        sprint.setStateSprint("done");
+        sprintTTRepository.save(sprint);
+
+        // Find nearest candidate sprint
+        List<SprintTT> candidates = sprintTTRepository
+                .findByPjIdAndSprIdNotAndStateSprintNot(sprint.getPjId(), sprId, "done");
+
+        SprintTT nextSprint = candidates.stream()
+                .min(Comparator.comparingLong(c -> {
+                    if (c.getDateStartSpr() == null || sprint.getDateEndSpr() == null) {
+                        return Long.MAX_VALUE;
+                    }
+                    return Math.abs(
+                        c.getDateStartSpr().toEpochDay() - sprint.getDateEndSpr().toEpochDay()
+                    );
+                }))
+                .orElse(null);
+
+        if (nextSprint != null) {
+            nextSprint.setStateSprint("active");
+            sprintTTRepository.save(nextSprint);
+
+            Optional<ProjectTT> projectOpt = projectTTRepository.findById(sprint.getPjId());
+            if (projectOpt.isPresent() && projectOpt.get().isAutoRollover()) {
+                rolloverTasks(sprId, nextSprint.getSprId());
+            }
+        }
+
+        return nextSprint;
+    }
+
+    private void rolloverTasks(long fromSprId, long toSprId) {
+        List<SprintTaskTT> active  = sprintTaskTTRepository.findByIdSprIdAndStateTask(fromSprId, "active");
+        List<SprintTaskTT> delayed = sprintTaskTTRepository.findByIdSprIdAndStateTask(fromSprId, "delayed");
+        for (SprintTaskTT st : active) {
+            sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), "active"));
+        }
+        for (SprintTaskTT st : delayed) {
+            sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), "active"));
+        }
+    }
+
     // ─── Business Logic (Stored Procedure Equivalents) ───────────────────
 
     /**
@@ -169,31 +275,31 @@ public class SprintTTService {
      *
      * This method is a Java reimplementation of the Oracle stored procedure:
      *
-     *   CREATE OR REPLACE PROCEDURE get_sprint_metrics (
-     *       p_spr_id      IN  NUMBER,
-     *       p_total_points OUT NUMBER,
-     *       p_task_count   OUT NUMBER
-     *   ) AS
-     *   BEGIN
-     *       SELECT SUM(t.story_points), COUNT(st.task_id)
-     *       INTO p_total_points, p_task_count
-     *       FROM sprint_task_tt st
-     *       JOIN task_tt t ON st.task_id = t.task_id
-     *       WHERE st.spr_id = p_spr_id;
+     * CREATE OR REPLACE PROCEDURE get_sprint_metrics (
+     * p_spr_id IN NUMBER,
+     * p_total_points OUT NUMBER,
+     * p_task_count OUT NUMBER
+     * ) AS
+     * BEGIN
+     * SELECT SUM(t.story_points), COUNT(st.task_id)
+     * INTO p_total_points, p_task_count
+     * FROM sprint_task_tt st
+     * JOIN task_tt t ON st.task_id = t.task_id
+     * WHERE st.spr_id = p_spr_id;
      *
-     *       DBMS_OUTPUT.PUT_LINE('Total Story Points: ' || p_total_points);
-     *       DBMS_OUTPUT.PUT_LINE('Total Tasks: '        || p_task_count);
-     *   END;
+     * DBMS_OUTPUT.PUT_LINE('Total Story Points: ' || p_total_points);
+     * DBMS_OUTPUT.PUT_LINE('Total Tasks: ' || p_task_count);
+     * END;
      *
      * Java equivalent:
-     *   - totalPoints ← TaskTTRepository.sumStoryPointsBySprint(sprId)
-     *                   (JPQL query with SUM + JOIN, same logic as the SP)
-     *   - taskCount   ← SprintTaskTTRepository.countByIdSprId(sprId)
-     *                   (COUNT(*) WHERE spr_id = ?)
+     * - totalPoints ← TaskTTRepository.sumStoryPointsBySprint(sprId)
+     * (JPQL query with SUM + JOIN, same logic as the SP)
+     * - taskCount ← SprintTaskTTRepository.countByIdSprId(sprId)
+     * (COUNT(*) WHERE spr_id = ?)
      *
      * The result is packed into SprintMetricsResult instead of OUT parameters.
      *
-     * @param sprId  the sprint ID to compute metrics for
+     * @param sprId the sprint ID to compute metrics for
      * @return SprintMetricsResult with totalPoints and taskCount populated
      * @throws IllegalArgumentException if no sprint with that ID exists
      */

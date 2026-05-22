@@ -39,49 +39,53 @@ export default function AddMemberModal({ isOpen, onClose, onSave, initialData }:
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl shadow-brand-dark/30 w-full max-w-md mx-4 p-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">
+        <h2 className="heading-page!">
           {isEditing ? 'Edit Member' : 'Add New Member'}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">Full Name</label>
+            <label htmlFor="name" className="label-form">Full Name</label>
             <input
+              id="name"
               type="text"
               required
               value={form.name}
               onChange={e => handleChange('name', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-colors"
+              className="input-brand"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">Email</label>
+            <label htmlFor="email" className="label-form">Email</label>
             <input
+              id="email"
               type="email"
               required
               value={form.email}
               onChange={e => handleChange('email', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-colors"
+              className="input-brand"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">Role</label>
+            <label htmlFor="role" className="label-form">Role</label>
             <input
+              id="role"
               type="text"
               required
               value={form.role}
               onChange={e => handleChange('role', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-colors"
+              className="input-brand"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">Telegram ID</label>
+            <label htmlFor="telegramId" className="label-form">Telegram ID</label>
             <input
+              id="telegramId"
               type="text"
               required
               value={form.telegramId}
               onChange={e => handleChange('telegramId', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-colors"
+              className="input-brand"
             />
           </div>
 
@@ -89,13 +93,13 @@ export default function AddMemberModal({ isOpen, onClose, onSave, initialData }:
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-full font-medium hover:bg-gray-50 transition-colors"
+              className="flex-1 btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 bg-brand hover:bg-brand-dark text-white py-3 rounded-full font-medium transition-colors"
+              className="flex-1 btn-primary"
             >
               {isEditing ? 'Save' : 'Add'}
             </button>

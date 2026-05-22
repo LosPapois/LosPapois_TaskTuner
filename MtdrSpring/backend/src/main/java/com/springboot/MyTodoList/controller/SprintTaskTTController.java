@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
@@ -17,72 +16,56 @@ public class SprintTaskTTController {
     @Autowired
     private SprintTaskTTService sprintTaskTTService;
 
-    @GetMapping(value = "/sprint-tasks")
+    @GetMapping("/sprint-tasks")
     public List<SprintTaskTT> getAllSprintTasks() {
         return sprintTaskTTService.findAll();
     }
 
-    @GetMapping(value = "/sprint-tasks/sprint/{sprId}")
+    @GetMapping("/sprint-tasks/sprint/{sprId}")
     public List<SprintTaskTT> getTasksInSprint(@PathVariable long sprId) {
         return sprintTaskTTService.getTasksInSprint(sprId);
     }
 
-    @GetMapping(value = "/sprint-tasks/task/{taskId}")
+    @GetMapping("/sprint-tasks/task/{taskId}")
     public List<SprintTaskTT> getSprintsForTask(@PathVariable long taskId) {
         return sprintTaskTTService.getSprintsForTask(taskId);
     }
 
-    @GetMapping(value = "/sprint-tasks/sprint/{sprId}/state/{stateTask}")
+    @GetMapping("/sprint-tasks/sprint/{sprId}/state/{stateTask}")
     public List<SprintTaskTT> getTasksByState(@PathVariable long sprId, @PathVariable String stateTask) {
         return sprintTaskTTService.getTasksByState(sprId, stateTask);
     }
 
-    @GetMapping(value = "/sprint-tasks/sprint/{sprId}/count")
+    @GetMapping("/sprint-tasks/sprint/{sprId}/count")
     public ResponseEntity<Long> countTasksInSprint(@PathVariable long sprId) {
         return new ResponseEntity<>(sprintTaskTTService.countTasksInSprint(sprId), HttpStatus.OK);
     }
 
-    @GetMapping(value = "/sprint-tasks/sprint/{sprId}/count/{stateTask}")
+    @GetMapping("/sprint-tasks/sprint/{sprId}/count/{stateTask}")
     public ResponseEntity<Long> countByState(@PathVariable long sprId, @PathVariable String stateTask) {
         return new ResponseEntity<>(sprintTaskTTService.countByState(sprId, stateTask), HttpStatus.OK);
     }
 
-    @GetMapping(value = "/sprint-tasks/{sprId}/{taskId}")
+    @GetMapping("/sprint-tasks/{sprId}/{taskId}")
     public ResponseEntity<SprintTaskTT> getEntry(@PathVariable long sprId, @PathVariable long taskId) {
-        Optional<SprintTaskTT> entry = sprintTaskTTService.getEntry(sprId, taskId);
-        return entry.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
-                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+        return ControllerHelper.okOrNotFound(sprintTaskTTService.getEntry(sprId, taskId));
     }
 
-    @PostMapping(value = "/sprint-tasks")
+    @PostMapping("/sprint-tasks")
     public ResponseEntity<SprintTaskTT> addTaskToSprint(@RequestParam long sprId, @RequestParam long taskId) {
-        SprintTaskTT entry = sprintTaskTTService.addTaskToSprint(sprId, taskId);
-        return new ResponseEntity<>(entry, HttpStatus.OK);
+        return new ResponseEntity<>(sprintTaskTTService.addTaskToSprint(sprId, taskId), HttpStatus.OK);
     }
 
-    @PatchMapping(value = "/sprint-tasks/{sprId}/{taskId}/state/{newState}")
-    public ResponseEntity<SprintTaskTT> updateTaskState(@PathVariable long sprId,
-                                                        @PathVariable long taskId,
-                                                        @PathVariable String newState) {
-        try {
-            SprintTaskTT updated = sprintTaskTTService.updateTaskState(sprId, taskId, newState);
-            if (updated == null) {
-                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(updated, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-        }
+    @PatchMapping("/sprint-tasks/{sprId}/{taskId}/state/{newState}")
+    public ResponseEntity<SprintTaskTT> updateTaskState(
+            @PathVariable long sprId,
+            @PathVariable long taskId,
+            @PathVariable String newState) {
+        return ControllerHelper.okOrNotFound(sprintTaskTTService.updateTaskState(sprId, taskId, newState));
     }
 
-    @DeleteMapping(value = "/sprint-tasks/{sprId}/{taskId}")
+    @DeleteMapping("/sprint-tasks/{sprId}/{taskId}")
     public ResponseEntity<Boolean> removeTaskFromSprint(@PathVariable long sprId, @PathVariable long taskId) {
-        Boolean flag = false;
-        try {
-            flag = sprintTaskTTService.removeTaskFromSprint(sprId, taskId);
-            return new ResponseEntity<>(flag, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(flag, HttpStatus.NOT_FOUND);
-        }
+        return ControllerHelper.deleted(sprintTaskTTService.removeTaskFromSprint(sprId, taskId));
     }
 }
