@@ -168,6 +168,7 @@ public class TaskTTService {
             task.setDateEndSetTask(updatedTask.getDateEndSetTask());
             task.setDateEndRealTask(updatedTask.getDateEndRealTask());
             task.setPriority(updatedTask.getPriority());
+            task.setInfoTask(updatedTask.getInfoTask());
             task.setFeatureId(updatedTask.getFeatureId());
             task.setUserId(updatedTask.getUserId());
             return taskTTRepository.save(task);
