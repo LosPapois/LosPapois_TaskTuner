@@ -29,4 +29,6 @@ ENV deepseek_api_key=${DEEPSEEK_API_KEY}
 ENV telegram_bot_token=${TELEGRAM_BOT_TOKEN}
 ENV telegram_bot_name=${TELEGRAM_BOT_NAME}
 
+ENV groq_api_key=${groq_api_key}
+
 ENTRYPOINT ["java","-jar","MyTodoList.jar"]
