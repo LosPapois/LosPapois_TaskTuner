@@ -278,10 +278,6 @@ public class BotActions {
                                 .build()))
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
-                                .text("✏️ Edit Task")
-                                .callbackData(BotCommands.EDIT_TASK.getCommand())
-                                .build(),
-                        InlineKeyboardButton.builder()
                                 .text("✏️ Edit Feature")
                                 .callbackData(BotCommands.EDIT_FEATURE.getCommand())
                                 .build()))
@@ -1324,15 +1320,20 @@ public class BotActions {
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
-                                .text("◀ Volver")
-                                .callbackData("TASK_PAGE:" + page)
-                                .build(),
-                        InlineKeyboardButton.builder()
                                 .text("✅ Done")
                                 .callbackData("DONE_TASK:" + taskId)
                                 .build(),
                         InlineKeyboardButton.builder()
-                                .text("🚪 Exit")
+                                .text("✏️ Edit")
+                                .callbackData("EDIT_PICK:" + taskId)
+                                .build()))
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                                .text("◀ Back")
+                                .callbackData("TASK_PAGE:" + page)
+                                .build(),
+                        InlineKeyboardButton.builder()
+                                .text("❌ Cancel")
                                 .callbackData("CANCEL")
                                 .build()))
                 .build();
@@ -3173,11 +3174,24 @@ public class BotActions {
      * @param fileId   Telegram file_id from the received document
      * @param fileName original file name (e.g. "sprint-plan.pdf")
      */
+    private static final java.util.Set<String> SUPPORTED_DOC_EXTENSIONS = java.util.Set.of(
+        ".pdf", ".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm", ".log"
+    );
+
     public void fnDocument(String fileId, String fileName) {
         UserTT user = getAuthenticatedUser();
         if (user == null) {
             BotHelper.sendMessageToTelegram(chatId,
                 "⚠️ You need to log in before uploading documents. Use /start.", telegramClient, null);
+            return;
+        }
+
+        String lowerName = fileName != null ? fileName.toLowerCase() : "";
+        boolean supported = SUPPORTED_DOC_EXTENSIONS.stream().anyMatch(lowerName::endsWith);
+        if (!supported) {
+            BotHelper.sendMessageToTelegram(chatId,
+                "❌ Unsupported file type. Please send a PDF or plain text file (.pdf, .txt, .md, .csv, .json).",
+                telegramClient, null);
             return;
         }
 
