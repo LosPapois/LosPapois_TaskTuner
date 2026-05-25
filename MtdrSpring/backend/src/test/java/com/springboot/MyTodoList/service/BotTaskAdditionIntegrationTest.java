@@ -377,7 +377,7 @@ class BotActionsTest {
     private BotActions actions(String requestText) {
         BotActions botActions = new BotActions(telegramClient, todoService, deepSeekService, groqService,
                 userTTService, sprintTTService, projectTTService, projectUserTTService, sprintTaskTTService,
-                taskTTService, featureTTService, null, null);
+                taskTTService, featureTTService, null, null, null);
         botActions.setChatId(CHAT_ID);
         botActions.setTelegramIdentity(TELEGRAM_IDENTITY);
         botActions.setRequestText(requestText);
