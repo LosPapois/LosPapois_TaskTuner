@@ -64,7 +64,7 @@ jobs:
           DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_BOT_NAME=${{ secrets.TELEGRAM_BOT_NAME }}
-          GROQ_API_KEY=${{ secrets.GROQ_API_KEY}}
+          GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
 
     # -------------------------------------------------------------
     # Kubernetes Deployment to Oracle Container Engine (OKE)
