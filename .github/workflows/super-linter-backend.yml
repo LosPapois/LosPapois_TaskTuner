@@ -15,6 +15,9 @@ on:
       - ".github/workflows/super-linter-backend.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint-backend:
     name: Lint Backend
