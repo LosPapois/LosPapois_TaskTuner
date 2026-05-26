@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.DocumentTT;
+import com.springboot.MyTodoList.model.EmbedStatus;
 import com.springboot.MyTodoList.repository.DocumentTTRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -69,7 +70,7 @@ public class DocumentTTService {
      * SELECT * FROM document_tt WHERE embed_status = 'loading'
      */
     public List<DocumentTT> getDocumentsPendingEmbedding() {
-        return documentTTRepository.findByEmbedStatus("loading");
+        return documentTTRepository.findByEmbedStatus(EmbedStatus.LOADING.value());
     }
 
     /**
@@ -80,7 +81,7 @@ public class DocumentTTService {
      * @return documents with embed_status = 'loaded' for that project
      */
     public List<DocumentTT> getLoadedDocumentsForProject(long pjId) {
-        return documentTTRepository.findByPjIdAndEmbedStatus(pjId, "loaded");
+        return documentTTRepository.findByPjIdAndEmbedStatus(pjId, EmbedStatus.LOADED.value());
     }
 
     // ─── Write Operations ─────────────────────────────────────────────────
@@ -100,7 +101,7 @@ public class DocumentTTService {
     public DocumentTT uploadDocument(DocumentTT newDoc) {
         // Stamp the upload time and set initial embedding status
         newDoc.setDateUpload(LocalDateTime.now());
-        newDoc.setEmbedStatus("loading");
+        newDoc.setEmbedStatus(EmbedStatus.LOADING.value());
         return documentTTRepository.save(newDoc);
     }
 
@@ -117,7 +118,7 @@ public class DocumentTTService {
         Optional<DocumentTT> existing = documentTTRepository.findById(id);
         if (existing.isPresent()) {
             DocumentTT doc = existing.get();
-            doc.setEmbedStatus("loaded");
+            doc.setEmbedStatus(EmbedStatus.LOADED.value());
             return documentTTRepository.save(doc);
         } else {
             return null;

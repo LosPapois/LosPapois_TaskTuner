@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.springboot.MyTodoList.dto.LoginRequest;
 import com.springboot.MyTodoList.dto.RegisterRequest;
+import com.springboot.MyTodoList.model.UserRole;
 import com.springboot.MyTodoList.model.UserTT;
 import com.springboot.MyTodoList.repository.UserTTRepository;
 
@@ -61,7 +62,7 @@ public class UserTTService {
             .filter(u ->
                 u.getPassword() != null
                     && passwordEncoder.matches(req.getPassword(), u.getPassword())
-                    && "manager".equalsIgnoreCase(u.getRole()));
+                    && UserRole.MANAGER.value().equalsIgnoreCase(u.getRole()));
     }
 
 
@@ -87,7 +88,7 @@ public class UserTTService {
         // Hash the password using BCrypt before storing
         user.setPassword(passwordEncoder.encode(req.getPassword()));
         user.setIdTelegram(req.getIdTelegram());
-        user.setRole("manager");
+        user.setRole(UserRole.MANAGER.value());
         return userTTRepository.save(user);
     }
 

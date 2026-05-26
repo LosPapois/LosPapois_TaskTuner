@@ -4,14 +4,18 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.springboot.MyTodoList.model.ProjectTT;
 import com.springboot.MyTodoList.model.SprintMetricsResult;
+import com.springboot.MyTodoList.model.SprintState;
 import com.springboot.MyTodoList.model.SprintTT;
 import com.springboot.MyTodoList.model.SprintTaskTT;
+import com.springboot.MyTodoList.model.TaskState;
 import com.springboot.MyTodoList.repository.ProjectTTRepository;
 import com.springboot.MyTodoList.repository.SprintTTRepository;
 import com.springboot.MyTodoList.repository.SprintTaskTTRepository;
@@ -47,6 +51,8 @@ import com.springboot.MyTodoList.repository.TaskTTRepository;
  */
 @Service
 public class SprintTTService {
+
+    private static final Logger logger = LoggerFactory.getLogger(SprintTTService.class);
 
     /** Repository for SPRINT_TT — primary data source for this service. */
     @Autowired
@@ -104,7 +110,7 @@ public class SprintTTService {
      */
     public List<SprintTT> getActiveAndDoneSprintsByProject(long pjId) {
         List<SprintTT> sprints = sprintTTRepository.findByPjIdAndStateSprintIn(pjId,
-                java.util.Arrays.asList("active", "done"));
+                java.util.Arrays.asList(SprintState.ACTIVE.value(), SprintState.DONE.value()));
         java.time.LocalDate today = java.time.LocalDate.now();
 
         return sprints.stream()
@@ -119,7 +125,7 @@ public class SprintTTService {
      * @return Optional containing the active sprint if it exists
      */
     public Optional<SprintTT> getActiveSprintForProject(long pjId) {
-        return sprintTTRepository.findByPjIdAndStateSprint(pjId, "active");
+        return sprintTTRepository.findByPjIdAndStateSprint(pjId, SprintState.ACTIVE.value());
     }
 
     // ─── Write Operations ─────────────────────────────────────────────────
@@ -171,6 +177,7 @@ public class SprintTTService {
             sprintTTRepository.deleteById(id);
             return true;
         } catch (Exception e) {
+            logger.error("Failed to delete sprint {}: {}", id, e.getMessage(), e);
             return false;
         }
     }
@@ -192,7 +199,7 @@ public class SprintTTService {
         if (!existing.isPresent()) return null;
 
         SprintTT sprint = existing.get();
-        sprint.setStateSprint("done");
+        sprint.setStateSprint(SprintState.DONE.value());
         sprintTTRepository.save(sprint);
 
         if (nextSprintId != null) {
@@ -226,12 +233,12 @@ public class SprintTTService {
         if (!existing.isPresent()) return null;
 
         SprintTT sprint = existing.get();
-        sprint.setStateSprint("done");
+        sprint.setStateSprint(SprintState.DONE.value());
         sprintTTRepository.save(sprint);
 
         // Find nearest candidate sprint
         List<SprintTT> candidates = sprintTTRepository
-                .findByPjIdAndSprIdNotAndStateSprintNot(sprint.getPjId(), sprId, "done");
+                .findByPjIdAndSprIdNotAndStateSprintNot(sprint.getPjId(), sprId, SprintState.DONE.value());
 
         SprintTT nextSprint = candidates.stream()
                 .min(Comparator.comparingLong(c -> {
@@ -245,7 +252,7 @@ public class SprintTTService {
                 .orElse(null);
 
         if (nextSprint != null) {
-            nextSprint.setStateSprint("active");
+            nextSprint.setStateSprint(SprintState.ACTIVE.value());
             sprintTTRepository.save(nextSprint);
 
             Optional<ProjectTT> projectOpt = projectTTRepository.findById(sprint.getPjId());
@@ -260,11 +267,21 @@ public class SprintTTService {
     private void rolloverTasks(long fromSprId, long toSprId) {
         List<SprintTaskTT> active  = sprintTaskTTRepository.findByIdSprIdAndStateTask(fromSprId, "active");
         List<SprintTaskTT> delayed = sprintTaskTTRepository.findByIdSprIdAndStateTask(fromSprId, "delayed");
+
+        // Active tasks: mark the SOURCE sprint entry as 'delayed' (the task
+        // didn't get finished in time) and create a fresh 'active' entry in
+        // the destination sprint. The historical 'delayed' row stays so the
+        // previous sprint keeps a record that the task slipped.
         for (SprintTaskTT st : active) {
+            st.setStateTask("delayed");
+            sprintTaskTTRepository.save(st);
             sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), "active"));
         }
+
+        // Already-delayed tasks: source entry stays 'delayed' (already a
+        // historical record), and we add an 'active' entry to the next sprint.
         for (SprintTaskTT st : delayed) {
-            sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), "active"));
+            sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), TaskState.ACTIVE.value()));
         }
     }
 
