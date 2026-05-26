@@ -58,3 +58,4 @@ jobs:
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_BOT_NAME=${{ secrets.TELEGRAM_BOT_NAME }}
           GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+          COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}
