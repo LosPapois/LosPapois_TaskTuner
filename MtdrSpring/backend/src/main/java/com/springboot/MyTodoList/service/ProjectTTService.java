@@ -2,12 +2,16 @@ package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.ProjectTT;
 import com.springboot.MyTodoList.model.ProjectUserTT;
+import com.springboot.MyTodoList.model.SprintState;
 import com.springboot.MyTodoList.model.SprintTT;
+import com.springboot.MyTodoList.model.UserRole;
 import com.springboot.MyTodoList.model.UserTT;
 import com.springboot.MyTodoList.repository.ProjectTTRepository;
 import com.springboot.MyTodoList.repository.ProjectUserTTRepository;
 import com.springboot.MyTodoList.repository.SprintTTRepository;
 import com.springboot.MyTodoList.repository.UserTTRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +32,8 @@ import java.util.Optional;
  */
 @Service
 public class ProjectTTService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ProjectTTService.class);
 
     @Autowired
     private ProjectTTRepository projectTTRepository;
@@ -167,7 +173,7 @@ public class ProjectTTService {
         // 2. Mark all sprints of this project as done
         List<SprintTT> sprints = sprintTTRepository.findByPjId(id);
         for (SprintTT sprint : sprints) {
-            sprint.setStateSprint("done");
+            sprint.setStateSprint(SprintState.DONE.value());
             sprintTTRepository.save(sprint);
         }
 
@@ -175,7 +181,7 @@ public class ProjectTTService {
         List<ProjectUserTT> members = projectUserTTRepository.findByIdPjId(id);
         for (ProjectUserTT membership : members) {
             Optional<UserTT> userOpt = userTTRepository.findById(membership.getUserId());
-            if (userOpt.isPresent() && "developer".equals(userOpt.get().getRole())) {
+            if (userOpt.isPresent() && UserRole.DEVELOPER.value().equals(userOpt.get().getRole())) {
                 projectUserTTRepository.deleteById(membership.getId());
             }
         }
@@ -195,6 +201,7 @@ public class ProjectTTService {
             projectTTRepository.deleteById(id);
             return true;
         } catch (Exception e) {
+            logger.error("Failed to delete project {}: {}", id, e.getMessage(), e);
             return false;
         }
     }

@@ -20,14 +20,17 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.springboot.MyTodoList.model.DocumentTT;
 import com.springboot.MyTodoList.model.FeatureTT;
 import com.springboot.MyTodoList.model.ProjectTT;
 import com.springboot.MyTodoList.model.ProjectUserTT;
+import com.springboot.MyTodoList.model.SprintState;
 import com.springboot.MyTodoList.model.SprintTT;
+import com.springboot.MyTodoList.model.TaskState;
 import com.springboot.MyTodoList.model.TaskTT;
 import com.springboot.MyTodoList.model.ToDoItem;
+import com.springboot.MyTodoList.model.UserRole;
 import com.springboot.MyTodoList.model.UserTT;
-import com.springboot.MyTodoList.model.DocumentTT;
 import com.springboot.MyTodoList.service.DeepSeekService;
 import com.springboot.MyTodoList.service.DocumentProcessingService;
 import com.springboot.MyTodoList.service.DocumentTTService;
@@ -395,10 +398,10 @@ public class BotActions {
         taskTTService.updateTask(taskId, task);
 
         sprintTaskTTService.getSprintsForTask(taskId).stream()
-                .filter(st -> "done".equals(st.getStateTask()))
+                .filter(st -> TaskState.DONE.value().equals(st.getStateTask()))
                 .findFirst()
                 .ifPresent(st -> sprintTaskTTService.updateTaskState(
-                        st.getId().getSprId(), taskId, "active"));
+                        st.getId().getSprId(), taskId, TaskState.ACTIVE.value()));
 
         BotHelper.sendMessageToTelegram(
                 chatId, "↩️ " + task.getNameTask() + " reopened successfully!", telegramClient, null);
@@ -659,7 +662,7 @@ public class BotActions {
         user.setNameUser(draft.getName());
         user.setMail(draft.getEmail());
         user.setPassword(draft.getPassword());
-        user.setRole("developer");
+        user.setRole(UserRole.DEVELOPER.value());
         user.setIdTelegram(telegramIdentity);
         userTTService.addUser(user);
 
@@ -844,7 +847,7 @@ public class BotActions {
                 : sprintTTService.findAll();
 
         List<SprintTT> available = source.stream()
-                .filter(s -> !"done".equals(s.getStateSprint()))
+                .filter(s -> !SprintState.DONE.value().equals(s.getStateSprint()))
                 .collect(Collectors.toList());
 
         // Seed only when user has no project AND there are truly no sprints in the DB
@@ -857,7 +860,7 @@ public class BotActions {
             if (!anySprintsInDb) {
                 seedSprints();
                 available = sprintTTService.findAll().stream()
-                        .filter(s -> !"done".equals(s.getStateSprint()))
+                        .filter(s -> !SprintState.DONE.value().equals(s.getStateSprint()))
                         .collect(Collectors.toList());
             }
         }
@@ -872,7 +875,7 @@ public class BotActions {
     private String sprintStateTag(SprintTT sprint) {
         boolean started = sprint.getDateStartSpr() != null
                 && !sprint.getDateStartSpr().isAfter(LocalDate.now());
-        return ("active".equals(sprint.getStateSprint()) && started) ? " ✅" : " 🕐";
+        return (SprintState.ACTIVE.value().equals(sprint.getStateSprint()) && started) ? " ✅" : " 🕐";
     }
 
     private void seedSprints() {
@@ -894,7 +897,7 @@ public class BotActions {
         s1.setDateStartSpr(LocalDate.now());
         s1.setDateEndSpr(LocalDate.now().plusWeeks(2));
         s1.setTaskGoal(20);
-        s1.setStateSprint("active");
+        s1.setStateSprint(SprintState.ACTIVE.value());
         s1.setPjId(pjId);
         sprintTTService.addSprint(s1);
 
@@ -1020,7 +1023,7 @@ public class BotActions {
         task.setStoryPoints(draft.getStoryPoints());
         // Active sprint → creation date as start. Future sprint → sprint's own start
         // date.
-        LocalDate startDate = "active".equals(sprint.getStateSprint())
+        LocalDate startDate = SprintState.ACTIVE.value().equals(sprint.getStateSprint())
                 ? LocalDate.now()
                 : sprint.getDateStartSpr();
         task.setDateStartTask(startDate);
@@ -1629,10 +1632,7 @@ public class BotActions {
                 .getSprintsForTask(task.getTaskId());
 
         try {
-            for (com.springboot.MyTodoList.model.SprintTaskTT st : currentSprints) {
-                sprintTaskTTService.removeTaskFromSprint(st.getId().getSprId(), task.getTaskId());
-            }
-            sprintTaskTTService.addTaskToSprint(newSprintId, task.getTaskId());
+            sprintTaskTTService.moveTaskToSprint(task.getTaskId(), currentSprints, newSprintId);
         } catch (Exception e) {
             logger.error("Error moving task to sprint: {}", e.getMessage(), e);
             BotHelper.sendMessageToTelegram(chatId, "Error moving task to sprint. Try again.", telegramClient, null);
@@ -2053,7 +2053,7 @@ public class BotActions {
 
         // Active sprint — scoped to user's project, latest start date wins
         SprintTT activeSprint = allSprints.stream()
-                .filter(s -> "active".equals(s.getStateSprint()))
+                .filter(s -> SprintState.ACTIVE.value().equals(s.getStateSprint()))
                 .max(Comparator.comparing(
                         s -> s.getDateStartSpr() != null ? s.getDateStartSpr() : java.time.LocalDate.MIN))
                 .orElse(null);
@@ -2845,7 +2845,7 @@ public class BotActions {
         }
 
         UserTT currentUser = getAuthenticatedUser();
-        LocalDate startDate = "active".equals(sprint.getStateSprint())
+        LocalDate startDate = SprintState.ACTIVE.value().equals(sprint.getStateSprint())
                 ? LocalDate.now()
                 : sprint.getDateStartSpr();
 
@@ -3098,10 +3098,10 @@ public class BotActions {
         taskTTService.updateTask(taskId, task);
 
         sprintTaskTTService.getSprintsForTask(taskId).stream()
-                .filter(st -> "active".equals(st.getStateTask()))
+                .filter(st -> TaskState.ACTIVE.value().equals(st.getStateTask()))
                 .findFirst()
                 .ifPresent(st -> sprintTaskTTService.updateTaskState(
-                        st.getId().getSprId(), taskId, "done"));
+                        st.getId().getSprId(), taskId, TaskState.DONE.value()));
 
         boolean onTime = !LocalDate.now().isAfter(task.getDateEndSetTask());
         String resultado = onTime ? "⏱ delivered on time!" : "⚠️ delivered late.";
