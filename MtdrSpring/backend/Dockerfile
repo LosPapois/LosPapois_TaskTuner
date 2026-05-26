@@ -19,6 +19,7 @@ ARG TELEGRAM_BOT_TOKEN
 ARG TELEGRAM_BOT_NAME
 
 ARG GROQ_API_KEY
+ARG COHERE_API_KEY
 
 ENV ui_username=${UI_USERNAME}
 ENV ui_password=${UI_PASSWORD}
@@ -32,5 +33,6 @@ ENV telegram_bot_token=${TELEGRAM_BOT_TOKEN}
 ENV telegram_bot_name=${TELEGRAM_BOT_NAME}
 
 ENV groq_api_key=${GROQ_API_KEY}
+ENV cohere_api_key=${COHERE_API_KEY}
 
 ENTRYPOINT ["java","-jar","MyTodoList.jar"]
