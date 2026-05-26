@@ -18,6 +18,8 @@ ARG DEEPSEEK_API_KEY
 ARG TELEGRAM_BOT_TOKEN
 ARG TELEGRAM_BOT_NAME
 
+ARG GROQ_API_KEY
+
 ENV ui_username=${UI_USERNAME}
 ENV ui_password=${UI_PASSWORD}
 ENV db_user=${DB_USER}
@@ -28,5 +30,7 @@ ENV driver_class_name=${DRIVER_CLASS_NAME}
 ENV deepseek_api_key=${DEEPSEEK_API_KEY}
 ENV telegram_bot_token=${TELEGRAM_BOT_TOKEN}
 ENV telegram_bot_name=${TELEGRAM_BOT_NAME}
+
+ENV groq_api_key=${GROQ_API_KEY}
 
 ENTRYPOINT ["java","-jar","MyTodoList.jar"]
