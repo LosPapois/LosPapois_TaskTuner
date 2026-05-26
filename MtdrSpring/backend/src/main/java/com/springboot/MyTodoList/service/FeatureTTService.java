@@ -51,6 +51,7 @@ public class FeatureTTService {
             FeatureTT f = existing.get();
             f.setNameFeature(updated.getNameFeature());
             f.setPriorityFeature(updated.getPriorityFeature());
+            f.setDescriptionFeature(updated.getDescriptionFeature());
             f.setSprId(updated.getSprId());
             return featureTTRepository.save(f);
         }
