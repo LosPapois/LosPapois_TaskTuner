@@ -5,6 +5,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
+import { CheckCircleIcon } from '@heroicons/react/24/solid';
 
 export type PriorityTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
@@ -79,15 +80,33 @@ const TASK_STATE_LABEL: Record<'active' | 'done' | 'delayed', string> = {
 function TaskItem({ task, onClick }: { task: FeatureTaskLite; onClick?: () => void }) {
   const priority = task.priority ?? 'none';
   const state = task.state ?? 'active';
+  // Same "done" treatment as the Team page member panel: green check +
+  // struck-through, muted name so completed work reads at a glance.
+  const isDone = state === 'done';
 
   return (
     <li
       className="bg-white border border-gray-200 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
       onClick={onClick}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        {isDone ? (
+          <CheckCircleIcon className="h-5 w-5 text-green-500 shrink-0" aria-hidden="true" />
+        ) : (
+          <span
+            className="h-5 w-5 rounded-full border-2 border-gray-300 shrink-0"
+            aria-hidden="true"
+          />
+        )}
+
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-gray-800 truncate">{task.name}</div>
+          <div
+            className={`text-sm font-medium truncate ${
+              isDone ? 'text-gray-400 line-through' : 'text-gray-800'
+            }`}
+          >
+            {task.name}
+          </div>
           {task.storyPoints != null && task.storyPoints > 0 && (
             <div className="text-xs text-gray-500 mt-0.5">{task.storyPoints} SP</div>
           )}
@@ -230,14 +249,20 @@ function FeatureDetailPanel({ feature, onTaskClick, onEdit, onDelete }: FeatureD
         </div>
       </div>
 
-      {/* Tasks */}
+      {/* Tasks — done items pushed to the bottom so pending work reads first */}
       <div>
         <h4 className="text-base font-semibold text-gray-800 mb-3">Linked Tasks</h4>
         {feature.tasks && feature.tasks.length > 0 ? (
           <ul className="space-y-2">
-            {feature.tasks.map(t => (
-              <TaskItem key={t.id} task={t} onClick={() => onTaskClick?.(t.id)} />
-            ))}
+            {[...feature.tasks]
+              .sort((a, b) => {
+                const aDone = a.state === 'done' ? 1 : 0;
+                const bDone = b.state === 'done' ? 1 : 0;
+                return aDone - bDone;
+              })
+              .map(t => (
+                <TaskItem key={t.id} task={t} onClick={() => onTaskClick?.(t.id)} />
+              ))}
           </ul>
         ) : (
           <p className="text-sm text-gray-400">No linked tasks</p>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ChevronRightIcon,
   PencilSquareIcon,
@@ -6,6 +6,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import MemberAvatar, { AvatarTone } from './MemberAvatar';
+
+// Max tasks shown per page before the pagination bar takes over.
+const TASKS_PER_PAGE = 10;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -172,6 +175,31 @@ function MemberDetailPanel({
   onDelete,
   onTaskClick
 }: MemberDetailPanelProps) {
+  // Pagination state for the Assigned Tasks list. Resets to page 1 when the
+  // selected member changes or the task count changes so we never land on
+  // an empty page after a switch or a deletion.
+  const [currentPage, setCurrentPage] = useState(1);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [member.id, tasks?.length]);
+
+  // Sort done tasks to the bottom so pending work always reads first.
+  // Stable sort keeps the relative order within each group.
+  const sortedTasks = tasks
+    ? [...tasks].sort((a, b) => {
+        const aDone = a.done ? 1 : 0;
+        const bDone = b.done ? 1 : 0;
+        return aDone - bDone;
+      })
+    : [];
+
+  const taskCount = sortedTasks.length;
+  const totalPages = Math.max(1, Math.ceil(taskCount / TASKS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * TASKS_PER_PAGE;
+  const pageEnd = Math.min(pageStart + TASKS_PER_PAGE, taskCount);
+  const paginatedTasks = sortedTasks.slice(pageStart, pageEnd);
+
   return (
     <div>
       {/* Header: avatar + identity + actions */}
@@ -230,11 +258,63 @@ function MemberDetailPanel({
               This member has no tasks assigned in this project.
             </p>
           ) : (
-            <ul className="space-y-2">
-              {tasks.map(t => (
-                <TaskItem key={t.id} task={t} onClick={() => onTaskClick?.(t.id)} />
-              ))}
-            </ul>
+            <>
+              <ul className="space-y-2">
+                {paginatedTasks.map(t => (
+                  <TaskItem key={t.id} task={t} onClick={() => onTaskClick?.(t.id)} />
+                ))}
+              </ul>
+
+              {/* Pagination bar — only when there's more than one page so */}
+              {/* members with few tasks keep a clean panel. */}
+              {totalPages > 1 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                  <span className="text-xs text-gray-500">
+                    Showing {pageStart + 1}–{pageEnd} of {tasks.length}
+                  </span>
+                  <nav className="flex items-center gap-1" aria-label="Tasks pagination">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={safePage === 1}
+                      aria-label="Previous page"
+                      className="px-2.5 py-1 text-sm border border-gray-200 rounded-md
+                                 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed
+                                 transition-colors"
+                    >
+                      ‹
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setCurrentPage(n)}
+                        aria-current={n === safePage ? 'page' : undefined}
+                        className={`min-w-[2rem] px-2.5 py-1 text-sm border rounded-md
+                                    transition-colors ${
+                          n === safePage
+                            ? 'border-brand bg-brand text-white'
+                            : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={safePage === totalPages}
+                      aria-label="Next page"
+                      className="px-2.5 py-1 text-sm border border-gray-200 rounded-md
+                                 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed
+                                 transition-colors"
+                    >
+                      ›
+                    </button>
+                  </nav>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

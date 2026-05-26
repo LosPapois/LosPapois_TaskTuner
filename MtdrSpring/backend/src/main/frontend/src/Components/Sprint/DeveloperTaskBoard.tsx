@@ -1,5 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { MemberListItem } from '../Team';
+
+// Max tasks shown per page in list mode before pagination kicks in.
+const TASKS_PER_PAGE = 10;
 
 export type TaskPriority = 'high' | 'medium' | 'low' | 'none';
 export type TaskState = 'active' | 'done' | 'delayed';
@@ -82,14 +86,32 @@ function TaskRow({
   task: DeveloperBoardTask;
   onClick?: (taskId: number) => void;
 }) {
+  // Mirrors the Team page treatment for completed tasks: filled green
+  // check + struck-through, muted name so done work reads at a glance.
+  const isDone = task.state === 'done';
   return (
     <li
       className="bg-white border border-gray-200 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
       onClick={() => onClick?.(task.id)}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        {isDone ? (
+          <CheckCircleIcon className="h-5 w-5 text-green-500 shrink-0" aria-hidden="true" />
+        ) : (
+          <span
+            className="h-5 w-5 rounded-full border-2 border-gray-300 shrink-0"
+            aria-hidden="true"
+          />
+        )}
+
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-gray-800 truncate">{task.name}</div>
+          <div
+            className={`text-sm font-medium truncate ${
+              isDone ? 'text-gray-400 line-through' : 'text-gray-800'
+            }`}
+          >
+            {task.name}
+          </div>
           {(task.featureName || task.storyPoints != null) && (
             <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
               {task.featureName && (
@@ -140,26 +162,43 @@ function KanbanColumn({
         <p className="text-xs text-gray-400">No tasks in this column.</p>
       ) : (
         <div className="space-y-2">
-          {tasks.map(task => (
-            <button
-              key={task.id}
-              type="button"
-              onClick={() => onTaskClick?.(task.id)}
-              className="w-full text-left bg-white border border-gray-200 rounded-lg p-2.5 hover:bg-gray-50 transition-colors"
-            >
-              <div className="text-sm font-medium text-gray-800 truncate">{task.name}</div>
-              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${PRIORITY_BADGE[task.priority]}`}
-                >
-                  {PRIORITY_LABEL[task.priority]}
-                </span>
-                {task.storyPoints != null && task.storyPoints > 0 && (
-                  <span className="text-[11px] text-gray-500">{task.storyPoints} SP</span>
-                )}
-              </div>
-            </button>
-          ))}
+          {tasks.map(task => {
+            const isDone = task.state === 'done';
+            return (
+              <button
+                key={task.id}
+                type="button"
+                onClick={() => onTaskClick?.(task.id)}
+                className="w-full text-left bg-white border border-gray-200 rounded-lg p-2.5 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {isDone && (
+                    <CheckCircleIcon
+                      className="h-4 w-4 text-green-500 shrink-0"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <div
+                    className={`text-sm font-medium truncate ${
+                      isDone ? 'text-gray-400 line-through' : 'text-gray-800'
+                    }`}
+                  >
+                    {task.name}
+                  </div>
+                </div>
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${PRIORITY_BADGE[task.priority]}`}
+                  >
+                    {PRIORITY_LABEL[task.priority]}
+                  </span>
+                  {task.storyPoints != null && task.storyPoints > 0 && (
+                    <span className="text-[11px] text-gray-500">{task.storyPoints} SP</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -180,6 +219,28 @@ export default function DeveloperTaskBoard({
   const activeTasks = tasks.filter(t => t.state === 'active');
   const doneTasks = tasks.filter(t => t.state === 'done');
   const delayedTasks = tasks.filter(t => t.state === 'delayed');
+
+  // Pagination state for list mode — Kanban is unaffected because it already
+  // splits tasks by state column. Reset to page 1 whenever the developer
+  // changes or the task count changes so we never land on an empty page.
+  const [currentPage, setCurrentPage] = useState(1);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedDeveloperKey, tasks.length]);
+
+  // Sort done tasks to the bottom so the list always shows pending work
+  // first. Stable sort keeps the relative order within each group.
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const aDone = a.state === 'done' ? 1 : 0;
+    const bDone = b.state === 'done' ? 1 : 0;
+    return aDone - bDone;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedTasks.length / TASKS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * TASKS_PER_PAGE;
+  const pageEnd = Math.min(pageStart + TASKS_PER_PAGE, sortedTasks.length);
+  const paginatedTasks = sortedTasks.slice(pageStart, pageEnd);
 
   return (
     <div className="border-t border-gray-100 pt-5 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
@@ -255,11 +316,63 @@ export default function DeveloperTaskBoard({
                 {tasks.length === 0 ? (
                   <p className="text-sm text-gray-400">No tasks assigned to this developer in this sprint.</p>
                 ) : (
-                  <ul className="space-y-2">
-                    {tasks.map(t => (
-                      <TaskRow key={t.id} task={t} onClick={onTaskClick} />
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="space-y-2">
+                      {paginatedTasks.map(t => (
+                        <TaskRow key={t.id} task={t} onClick={onTaskClick} />
+                      ))}
+                    </ul>
+
+                    {/* Pagination bar — only rendered when there's more than */}
+                    {/* one page so a short task list stays clean. */}
+                    {totalPages > 1 && (
+                      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                        <span className="text-xs text-gray-500">
+                          Showing {pageStart + 1}–{pageEnd} of {tasks.length}
+                        </span>
+                        <nav className="flex items-center gap-1" aria-label="Tasks pagination">
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={safePage === 1}
+                            aria-label="Previous page"
+                            className="px-2.5 py-1 text-sm border border-gray-200 rounded-md
+                                       hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed
+                                       transition-colors"
+                          >
+                            ‹
+                          </button>
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setCurrentPage(n)}
+                              aria-current={n === safePage ? 'page' : undefined}
+                              className={`min-w-[2rem] px-2.5 py-1 text-sm border rounded-md
+                                          transition-colors ${
+                                n === safePage
+                                  ? 'border-brand bg-brand text-white'
+                                  : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={safePage === totalPages}
+                            aria-label="Next page"
+                            className="px-2.5 py-1 text-sm border border-gray-200 rounded-md
+                                       hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed
+                                       transition-colors"
+                          >
+                            ›
+                          </button>
+                        </nav>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ) : (
