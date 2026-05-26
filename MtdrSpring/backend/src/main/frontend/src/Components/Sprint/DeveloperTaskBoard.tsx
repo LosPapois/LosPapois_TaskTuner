@@ -216,21 +216,43 @@ export default function DeveloperTaskBoard({
   onModeChange,
   onTaskClick,
 }: DeveloperTaskBoardProps) {
-  const activeTasks = tasks.filter(t => t.state === 'active');
-  const doneTasks = tasks.filter(t => t.state === 'done');
-  const delayedTasks = tasks.filter(t => t.state === 'delayed');
+  // Filters — apply to BOTH list and kanban views so the developer sees a
+  // consistent filtered set regardless of mode. Reset whenever the selected
+  // developer changes so each switch starts clean.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | TaskPriority>('all');
+  const [stateFilter, setStateFilter] = useState<'all' | TaskState>('all');
+  useEffect(() => {
+    setSearchQuery('');
+    setPriorityFilter('all');
+    setStateFilter('all');
+  }, [selectedDeveloperKey]);
+
+  const filteredTasks = tasks.filter(t => {
+    if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
+    if (stateFilter !== 'all' && t.state !== stateFilter) return false;
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.trim().toLowerCase();
+      if (!t.name.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const activeTasks = filteredTasks.filter(t => t.state === 'active');
+  const doneTasks = filteredTasks.filter(t => t.state === 'done');
+  const delayedTasks = filteredTasks.filter(t => t.state === 'delayed');
 
   // Pagination state for list mode — Kanban is unaffected because it already
   // splits tasks by state column. Reset to page 1 whenever the developer
-  // changes or the task count changes so we never land on an empty page.
+  // changes or the filtered count changes so we never land on an empty page.
   const [currentPage, setCurrentPage] = useState(1);
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedDeveloperKey, tasks.length]);
+  }, [selectedDeveloperKey, filteredTasks.length]);
 
   // Sort done tasks to the bottom so the list always shows pending work
   // first. Stable sort keeps the relative order within each group.
-  const sortedTasks = [...tasks].sort((a, b) => {
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
     const aDone = a.state === 'done' ? 1 : 0;
     const bDone = b.state === 'done' ? 1 : 0;
     return aDone - bDone;
@@ -241,6 +263,9 @@ export default function DeveloperTaskBoard({
   const pageStart = (safePage - 1) * TASKS_PER_PAGE;
   const pageEnd = Math.min(pageStart + TASKS_PER_PAGE, sortedTasks.length);
   const paginatedTasks = sortedTasks.slice(pageStart, pageEnd);
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' || priorityFilter !== 'all' || stateFilter !== 'all';
 
   return (
     <div className="border-t border-gray-100 pt-5 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
@@ -308,6 +333,45 @@ export default function DeveloperTaskBoard({
               <MiniKpi label="Current Progress" value={kpis.progress} />
             </div>
 
+            {/* Filters: search by name + priority dropdown + state dropdown. */}
+            {/* Applied to both list and kanban modes. */}
+            {tasks.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Search tasks…"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="flex-1 min-w-[180px] px-3 py-1.5 text-sm border border-gray-300
+                             rounded-lg placeholder:text-gray-400
+                             focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+                />
+                <select
+                  value={priorityFilter}
+                  onChange={e => setPriorityFilter(e.target.value as 'all' | TaskPriority)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white
+                             focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+                >
+                  <option value="all">All priorities</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                  <option value="none">Not set</option>
+                </select>
+                <select
+                  value={stateFilter}
+                  onChange={e => setStateFilter(e.target.value as 'all' | TaskState)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white
+                             focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+                >
+                  <option value="all">All states</option>
+                  <option value="active">Active</option>
+                  <option value="done">Done</option>
+                  <option value="delayed">Delayed</option>
+                </select>
+              </div>
+            )}
+
             {mode === 'list' ? (
               <div>
                 <h4 className="text-base font-semibold text-gray-800 mb-3">
@@ -315,6 +379,12 @@ export default function DeveloperTaskBoard({
                 </h4>
                 {tasks.length === 0 ? (
                   <p className="text-sm text-gray-400">No tasks assigned to this developer in this sprint.</p>
+                ) : filteredTasks.length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    {hasActiveFilters
+                      ? 'No tasks match the current filters.'
+                      : 'No tasks to show.'}
+                  </p>
                 ) : (
                   <>
                     <ul className="space-y-2">
@@ -324,11 +394,12 @@ export default function DeveloperTaskBoard({
                     </ul>
 
                     {/* Pagination bar — only rendered when there's more than */}
-                    {/* one page so a short task list stays clean. */}
+                    {/* one page so a short task list stays clean. Total comes */}
+                    {/* from filteredTasks so the count reflects the visible set. */}
                     {totalPages > 1 && (
                       <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
                         <span className="text-xs text-gray-500">
-                          Showing {pageStart + 1}–{pageEnd} of {tasks.length}
+                          Showing {pageStart + 1}–{pageEnd} of {filteredTasks.length}
                         </span>
                         <nav className="flex items-center gap-1" aria-label="Tasks pagination">
                           <button
