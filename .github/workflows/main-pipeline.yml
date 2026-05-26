@@ -3,8 +3,6 @@ name: Production CI/CD (OCI)
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 env:
   # These mapped from GitHub Secrets
@@ -65,6 +63,7 @@ jobs:
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_BOT_NAME=${{ secrets.TELEGRAM_BOT_NAME }}
           GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+          COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}
 
     # -------------------------------------------------------------
     # Kubernetes Deployment to Oracle Container Engine (OKE)
