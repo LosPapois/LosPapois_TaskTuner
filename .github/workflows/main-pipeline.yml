@@ -3,8 +3,6 @@ name: Production CI/CD (OCI)
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 env:
   # These mapped from GitHub Secrets
