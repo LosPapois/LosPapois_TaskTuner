@@ -1,7 +1,10 @@
 package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.SubTaskTT;
+import com.springboot.MyTodoList.model.TaskState;
 import com.springboot.MyTodoList.repository.SubTaskTTRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +28,8 @@ import java.util.Optional;
  */
 @Service
 public class SubTaskTTService {
+
+    private static final Logger logger = LoggerFactory.getLogger(SubTaskTTService.class);
 
     @Autowired
     private SubTaskTTRepository subTaskTTRepository;
@@ -107,6 +112,7 @@ public class SubTaskTTService {
             subTaskTTRepository.deleteById(id);
             return true;
         } catch (Exception e) {
+            logger.error("Failed to delete subtask {}: {}", id, e.getMessage(), e);
             return false;
         }
     }
@@ -122,7 +128,7 @@ public class SubTaskTTService {
      */
     public Map<String, Object> getTaskProgress(long taskId) {
         long totalSubs = subTaskTTRepository.countByTaskId(taskId);
-        long completedSubs = subTaskTTRepository.countByTaskIdAndStateSub(taskId, "done");
+        long completedSubs = subTaskTTRepository.countByTaskIdAndStateSub(taskId, TaskState.DONE.value());
 
         double progressPercent = 0.0;
         if (totalSubs > 0) {
@@ -147,7 +153,7 @@ public class SubTaskTTService {
      */
     public boolean checkSubTaskCompletion(long taskId) {
         long totalSubs = subTaskTTRepository.countByTaskId(taskId);
-        long completedSubs = subTaskTTRepository.countByTaskIdAndStateSub(taskId, "done");
+        long completedSubs = subTaskTTRepository.countByTaskIdAndStateSub(taskId, TaskState.DONE.value());
 
         // If they matching, there are no pending subtasks
         return totalSubs > 0 && totalSubs == completedSubs;
@@ -165,7 +171,7 @@ public class SubTaskTTService {
         SubTaskTT quickSubTask = new SubTaskTT();
         quickSubTask.setNameSub(name);
         quickSubTask.setTaskId(taskId);
-        quickSubTask.setStateSub("active");
+        quickSubTask.setStateSub(TaskState.ACTIVE.value());
         quickSubTask.setPrioritySub("medium");
         quickSubTask.setDateStartSub(LocalDate.now());
 

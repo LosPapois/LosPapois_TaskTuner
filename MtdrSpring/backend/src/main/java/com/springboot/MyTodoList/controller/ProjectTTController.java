@@ -1,14 +1,13 @@
 package com.springboot.MyTodoList.controller;
 
+import com.springboot.MyTodoList.dto.ProjectSettingsRequest;
 import com.springboot.MyTodoList.model.ProjectTT;
 import com.springboot.MyTodoList.service.ProjectTTService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -58,16 +57,10 @@ public class ProjectTTController {
     @PatchMapping("/projects/{id}/settings")
     public ResponseEntity<ProjectTT> updateProjectSettings(
             @PathVariable long id,
-            @RequestBody Map<String, Object> body) {
-        try {
-            String namePj = (String) body.getOrDefault("namePj", null);
-            boolean autoRollover    = Boolean.TRUE.equals(body.get("autoRollover"));
-            boolean autoCloseSprints = Boolean.TRUE.equals(body.get("autoCloseSprints"));
-            ProjectTT updated = projectTTService.updateProjectSettings(id, namePj, autoRollover, autoCloseSprints);
-            return ControllerHelper.okOrNotFound(updated);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+            @RequestBody ProjectSettingsRequest body) {
+        ProjectTT updated = projectTTService.updateProjectSettings(
+                id, body.getNamePj(), body.isAutoRollover(), body.isAutoCloseSprints());
+        return ControllerHelper.okOrNotFound(updated);
     }
 
     @PatchMapping("/projects/{id}/close")

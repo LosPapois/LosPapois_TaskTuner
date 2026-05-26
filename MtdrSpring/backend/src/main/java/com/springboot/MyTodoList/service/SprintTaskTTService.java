@@ -2,9 +2,13 @@ package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.SprintTaskKey;
 import com.springboot.MyTodoList.model.SprintTaskTT;
+import com.springboot.MyTodoList.model.TaskState;
 import com.springboot.MyTodoList.repository.SprintTaskTTRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +31,8 @@ import java.util.Optional;
  */
 @Service
 public class SprintTaskTTService {
+
+    private static final Logger logger = LoggerFactory.getLogger(SprintTaskTTService.class);
 
     @Autowired
     private SprintTaskTTRepository sprintTaskTTRepository;
@@ -125,7 +131,7 @@ public class SprintTaskTTService {
      */
     public SprintTaskTT addTaskToSprint(long sprId, long taskId) {
         // New sprint tasks start as 'active' — the developer hasn't touched them yet
-        SprintTaskTT entry = new SprintTaskTT(sprId, taskId, "active");
+        SprintTaskTT entry = new SprintTaskTT(sprId, taskId, TaskState.ACTIVE.value());
         return sprintTaskTTRepository.save(entry);
     }
 
@@ -162,12 +168,21 @@ public class SprintTaskTTService {
      * @param taskId  the task to remove
      * @return true if removed, false on exception
      */
+    @Transactional
+    public void moveTaskToSprint(long taskId, List<SprintTaskTT> currentSprints, long newSprintId) {
+        for (SprintTaskTT st : currentSprints) {
+            sprintTaskTTRepository.deleteById(new SprintTaskKey(st.getId().getSprId(), taskId));
+        }
+        sprintTaskTTRepository.save(new SprintTaskTT(newSprintId, taskId, TaskState.ACTIVE.value()));
+    }
+
     public boolean removeTaskFromSprint(long sprId, long taskId) {
         try {
             SprintTaskKey key = new SprintTaskKey(sprId, taskId);
             sprintTaskTTRepository.deleteById(key);
             return true;
         } catch (Exception e) {
+            logger.error("Failed to remove task {} from sprint {}: {}", taskId, sprId, e.getMessage(), e);
             return false;
         }
     }
