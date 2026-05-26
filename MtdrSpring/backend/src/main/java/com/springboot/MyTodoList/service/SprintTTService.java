@@ -260,9 +260,19 @@ public class SprintTTService {
     private void rolloverTasks(long fromSprId, long toSprId) {
         List<SprintTaskTT> active  = sprintTaskTTRepository.findByIdSprIdAndStateTask(fromSprId, "active");
         List<SprintTaskTT> delayed = sprintTaskTTRepository.findByIdSprIdAndStateTask(fromSprId, "delayed");
+
+        // Active tasks: mark the SOURCE sprint entry as 'delayed' (the task
+        // didn't get finished in time) and create a fresh 'active' entry in
+        // the destination sprint. The historical 'delayed' row stays so the
+        // previous sprint keeps a record that the task slipped.
         for (SprintTaskTT st : active) {
+            st.setStateTask("delayed");
+            sprintTaskTTRepository.save(st);
             sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), "active"));
         }
+
+        // Already-delayed tasks: source entry stays 'delayed' (already a
+        // historical record), and we add an 'active' entry to the next sprint.
         for (SprintTaskTT st : delayed) {
             sprintTaskTTRepository.save(new SprintTaskTT(toSprId, st.getId().getTaskId(), "active"));
         }

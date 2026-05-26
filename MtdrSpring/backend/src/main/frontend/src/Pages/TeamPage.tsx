@@ -455,6 +455,9 @@ export default function TeamPage() {
           priority: mapTaskPriority(t.priority) as MemberTaskPriority,
           storyPoints: t.storyPoints,
           done: t.dateEndRealTask != null,
+          // Carry the raw ISO date fields through so the panel can sort by them.
+          dateStartTask: t.dateStartTask,
+          dateEndSetTask: t.dateEndSetTask,
         };
       })
       // Pending tasks on top, then by priority (high → low), then by name.

@@ -45,6 +45,10 @@ export interface MemberTaskLite {
   storyPoints?: number | null;
   /** True when the task has a real end date — i.e., actually closed. */
   done: boolean;
+  /** ISO date string from the backend, used for sorting in the panel. */
+  dateStartTask?: string | null;
+  /** ISO date string for the planned end date (TaskTT.dateEndSetTask). */
+  dateEndSetTask?: string | null;
 }
 
 export interface MemberDetailPanelProps {
@@ -175,23 +179,72 @@ function MemberDetailPanel({
   onDelete,
   onTaskClick
 }: MemberDetailPanelProps) {
+  // Filters + sort — controlled inputs above the task list. Reset when the
+  // member changes so each panel starts fresh.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | MemberTaskPriority>('all');
+  const [stateFilter, setStateFilter] = useState<'all' | 'done' | 'pending'>('all');
+  const [sortBy, setSortBy] = useState<
+    'none' | 'start-asc' | 'start-desc' | 'end-asc' | 'end-desc'
+  >('none');
+
   // Pagination state for the Assigned Tasks list. Resets to page 1 when the
   // selected member changes or the task count changes so we never land on
   // an empty page after a switch or a deletion.
   const [currentPage, setCurrentPage] = useState(1);
   useEffect(() => {
     setCurrentPage(1);
-  }, [member.id, tasks?.length]);
+    setSearchQuery('');
+    setPriorityFilter('all');
+    setStateFilter('all');
+    setSortBy('none');
+  }, [member.id]);
 
-  // Sort done tasks to the bottom so pending work always reads first.
-  // Stable sort keeps the relative order within each group.
-  const sortedTasks = tasks
-    ? [...tasks].sort((a, b) => {
-        const aDone = a.done ? 1 : 0;
-        const bDone = b.done ? 1 : 0;
-        return aDone - bDone;
-      })
-    : [];
+  // Apply filters first, then sort done to the bottom. Pagination kicks in
+  // after the filter+sort so page indices map to the currently visible set.
+  const filteredTasks = (tasks ?? []).filter(t => {
+    if (priorityFilter !== 'all' && (t.priority ?? 'none') !== priorityFilter) return false;
+    if (stateFilter === 'done' && !t.done) return false;
+    if (stateFilter === 'pending' && t.done) return false;
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.trim().toLowerCase();
+      if (!t.name.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Sort pipeline: done tasks always go to the bottom (Option A behavior),
+  // and within each group (pending / done) we apply the user's date sort.
+  // Tasks without a date go to the end of their group regardless of direction.
+  const compareDates = (a: MemberTaskLite, b: MemberTaskLite): number => {
+    if (sortBy === 'none') return 0;
+    const field: keyof MemberTaskLite =
+      sortBy === 'start-asc' || sortBy === 'start-desc'
+        ? 'dateStartTask'
+        : 'dateEndSetTask';
+    const dir = (sortBy === 'start-desc' || sortBy === 'end-desc') ? -1 : 1;
+    const av = a[field] as string | null | undefined;
+    const bv = b[field] as string | null | undefined;
+    // Empty/null dates go last regardless of direction.
+    if (!av && !bv) return 0;
+    if (!av) return 1;
+    if (!bv) return -1;
+    const cmp = av.localeCompare(bv); // ISO date strings compare lexicographically
+    return cmp * dir;
+  };
+
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    const aDone = a.done ? 1 : 0;
+    const bDone = b.done ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    return compareDates(a, b);
+  });
+
+  // Reset to page 1 whenever the filter result count changes — prevents
+  // landing on an empty page when filters narrow the list aggressively.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortedTasks.length]);
 
   const taskCount = sortedTasks.length;
   const totalPages = Math.max(1, Math.ceil(taskCount / TASKS_PER_PAGE));
@@ -199,6 +252,10 @@ function MemberDetailPanel({
   const pageStart = (safePage - 1) * TASKS_PER_PAGE;
   const pageEnd = Math.min(pageStart + TASKS_PER_PAGE, taskCount);
   const paginatedTasks = sortedTasks.slice(pageStart, pageEnd);
+
+  const hasAnyTasks = (tasks ?? []).length > 0;
+  const hasActiveFilters =
+    searchQuery.trim() !== '' || priorityFilter !== 'all' || stateFilter !== 'all';
 
   return (
     <div>
@@ -253,24 +310,79 @@ function MemberDetailPanel({
           <h4 className="text-base font-semibold text-gray-800 mt-6 mb-3">
             Assigned Tasks ({tasks.length})
           </h4>
-          {tasks.length === 0 ? (
+          {!hasAnyTasks ? (
             <p className="text-sm text-gray-400">
               This member has no tasks assigned in this project.
             </p>
           ) : (
             <>
-              <ul className="space-y-2">
-                {paginatedTasks.map(t => (
-                  <TaskItem key={t.id} task={t} onClick={() => onTaskClick?.(t.id)} />
-                ))}
-              </ul>
+              {/* Filters: search by name + priority dropdown + state dropdown */}
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <input
+                  type="text"
+                  placeholder="Search tasks…"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="flex-1 min-w-[140px] px-3 py-1.5 text-sm border border-gray-300
+                             rounded-lg placeholder:text-gray-400
+                             focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+                />
+                <select
+                  value={priorityFilter}
+                  onChange={e => setPriorityFilter(e.target.value as 'all' | MemberTaskPriority)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white
+                             focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+                >
+                  <option value="all">All priorities</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                  <option value="none">Not set</option>
+                </select>
+                <select
+                  value={stateFilter}
+                  onChange={e => setStateFilter(e.target.value as 'all' | 'done' | 'pending')}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white
+                             focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+                >
+                  <option value="all">All states</option>
+                  <option value="pending">Pending</option>
+                  <option value="done">Done</option>
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white
+                             focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+                >
+                  <option value="none">No sort</option>
+                  <option value="start-asc">Start date ↑</option>
+                  <option value="start-desc">Start date ↓</option>
+                  <option value="end-asc">End date ↑</option>
+                  <option value="end-desc">End date ↓</option>
+                </select>
+              </div>
 
-              {/* Pagination bar — only when there's more than one page so */}
-              {/* members with few tasks keep a clean panel. */}
+              {taskCount === 0 ? (
+                <p className="text-sm text-gray-400">
+                  {hasActiveFilters
+                    ? 'No tasks match the current filters.'
+                    : 'No tasks to show.'}
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {paginatedTasks.map(t => (
+                    <TaskItem key={t.id} task={t} onClick={() => onTaskClick?.(t.id)} />
+                  ))}
+                </ul>
+              )}
+
+              {/* Pagination bar — only when the filtered list has more than */}
+              {/* one page so a short visible list stays clean. */}
               {totalPages > 1 && (
                 <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
                   <span className="text-xs text-gray-500">
-                    Showing {pageStart + 1}–{pageEnd} of {tasks.length}
+                    Showing {pageStart + 1}–{pageEnd} of {taskCount}
                   </span>
                   <nav className="flex items-center gap-1" aria-label="Tasks pagination">
                     <button
