@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.DocumentTT;
+import com.springboot.MyTodoList.model.EmbedStatus;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.slf4j.Logger;
@@ -71,7 +72,7 @@ public class DocumentProcessingService {
 
             // Mark as loaded immediately (text is already extracted inline)
             documentTTService.markAsLoaded(saved.getDocId());
-            saved.setEmbedStatus("loaded");
+            saved.setEmbedStatus(EmbedStatus.LOADED.value());
 
             // Index chunks into Oracle 23ai VECTOR table for semantic search
             vectorService.indexDocument(saved.getDocId(), pjId, text);

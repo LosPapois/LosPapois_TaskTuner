@@ -3,6 +3,8 @@ package com.springboot.MyTodoList.service;
 import com.springboot.MyTodoList.model.TaskTT;
 import com.springboot.MyTodoList.repository.ProjectUserTTRepository;
 import com.springboot.MyTodoList.repository.TaskTTRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +35,8 @@ import java.util.Optional;
  */
 @Service
 public class TaskTTService {
+
+    private static final Logger logger = LoggerFactory.getLogger(TaskTTService.class);
 
     /*
      * Repository for TASK_TT — main data source for this service.
@@ -189,6 +193,7 @@ public class TaskTTService {
             taskTTRepository.deleteById(id);
             return true;
         } catch (Exception e) {
+            logger.error("Failed to delete task {}: {}", id, e.getMessage(), e);
             return false;
         }
     }
