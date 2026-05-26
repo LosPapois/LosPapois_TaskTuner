@@ -84,6 +84,10 @@ public class DocumentProcessingService {
         }
     }
 
+    private static final java.util.Set<String> TEXT_EXTENSIONS = java.util.Set.of(
+        ".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm", ".log"
+    );
+
     private String extractText(java.io.File file, String fileName) throws IOException {
         String lower = fileName != null ? fileName.toLowerCase() : "";
         if (lower.endsWith(".pdf")) {
@@ -91,7 +95,12 @@ public class DocumentProcessingService {
                 return new PDFTextStripper().getText(pdf).strip();
             }
         }
-        // Plain text / other — read as UTF-8
-        return new String(java.nio.file.Files.readAllBytes(file.toPath())).strip();
+        boolean isText = TEXT_EXTENSIONS.stream().anyMatch(lower::endsWith);
+        if (!isText) {
+            logger.warn("DocumentProcessingService: unsupported file type '{}' — skipping text extraction", fileName);
+            return "";
+        }
+        return new String(java.nio.file.Files.readAllBytes(file.toPath()),
+                          java.nio.charset.StandardCharsets.UTF_8).strip();
     }
 }

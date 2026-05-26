@@ -3174,11 +3174,24 @@ public class BotActions {
      * @param fileId   Telegram file_id from the received document
      * @param fileName original file name (e.g. "sprint-plan.pdf")
      */
+    private static final java.util.Set<String> SUPPORTED_DOC_EXTENSIONS = java.util.Set.of(
+        ".pdf", ".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm", ".log"
+    );
+
     public void fnDocument(String fileId, String fileName) {
         UserTT user = getAuthenticatedUser();
         if (user == null) {
             BotHelper.sendMessageToTelegram(chatId,
                 "⚠️ You need to log in before uploading documents. Use /start.", telegramClient, null);
+            return;
+        }
+
+        String lowerName = fileName != null ? fileName.toLowerCase() : "";
+        boolean supported = SUPPORTED_DOC_EXTENSIONS.stream().anyMatch(lowerName::endsWith);
+        if (!supported) {
+            BotHelper.sendMessageToTelegram(chatId,
+                "❌ Unsupported file type. Please send a PDF or plain text file (.pdf, .txt, .md, .csv, .json).",
+                telegramClient, null);
             return;
         }
 
