@@ -32,6 +32,7 @@ import com.springboot.MyTodoList.service.SprintTTService;
 import com.springboot.MyTodoList.service.TaskTTService;
 import com.springboot.MyTodoList.service.ToDoItemService;
 import com.springboot.MyTodoList.service.UserTTService;
+import com.springboot.MyTodoList.service.VectorService;
 import com.springboot.MyTodoList.util.BotActions;
 
 @Component
@@ -52,6 +53,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
     private final FeatureTTService featureTTService;
     private final DocumentTTService documentTTService;
     private final DocumentProcessingService documentProcessingService;
+    private final VectorService vectorService;
     private final TelegramClient telegramClient;
     private final BotProps botProps;
 
@@ -73,6 +75,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
             FeatureTTService featureTTService,
             DocumentTTService documentTTService,
             DocumentProcessingService documentProcessingService,
+            VectorService vectorService,
             TelegramClient telegramClient) {
         this.botProps = bp;
         this.telegramClient = telegramClient;
@@ -88,6 +91,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
         this.featureTTService = featureTTService;
         this.documentTTService = documentTTService;
         this.documentProcessingService = documentProcessingService;
+        this.vectorService = vectorService;
     }
 
     @Override
@@ -219,7 +223,7 @@ public class ToDoItemBotController implements SpringLongPollingBot, LongPollingU
                 groqService,
                 userTTService, sprintTTService, projectTTService, projectUserTTService,
                 sprintTaskTTService, taskTTService, featureTTService,
-                documentTTService, documentProcessingService);
+                documentTTService, documentProcessingService, vectorService);
         actions.setChatId(chatId);
         actions.setTelegramIdentity(telegramIdentity);
         return actions;
