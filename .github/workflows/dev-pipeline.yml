@@ -29,7 +29,6 @@ jobs:
         echo "${{ secrets.ORACLE_WALLET_BASE64 }}" | base64 -d > Wallet_TaskTuner.zip
         unzip Wallet_TaskTuner.zip -d .
         # The zip contains the 'wallet/' folder, so it will extract correctly here.
-
     - name: Build with Maven (Includes Frontend)
       # Treating warnings as errors is disabled to suppress React linting failures in CI
       run: CI=false ./mvnw clean package
@@ -47,5 +46,4 @@ jobs:
           --build-arg TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}" \
           --build-arg TELEGRAM_BOT_NAME="${{ secrets.TELEGRAM_BOT_NAME }}" \
           --build-arg GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
-          --build-arg COHERE_API_KEY="${{ secrets.COHERE_API_KEY }}" \
           -f Dockerfile .
