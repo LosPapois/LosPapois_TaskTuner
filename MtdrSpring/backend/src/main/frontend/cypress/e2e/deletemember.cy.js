@@ -14,14 +14,16 @@ describe('Eliminar miembro del proyecto', () => {
 
     cy.get('main').contains('Cypress').click()
 
-    cy.contains('Miembro Cypress 2').click()
+    cy.contains('Miembro Cypress').click()
 
     cy.contains('Completed').should('exist')
 
     cy.contains('Delete').click()
 
+    cy.on('window:confirm', () => true)
+
     cy.contains('Confirm Remove').click()
 
-    cy.contains('Miembro Cypress 2').should('not.exist')
+    cy.contains('Miembro Cypress').should('not.exist')
   })
 })
