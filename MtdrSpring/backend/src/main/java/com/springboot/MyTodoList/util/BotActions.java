@@ -950,16 +950,6 @@ public class BotActions {
     private void showFeatureSelectionForSprint(long sprintId) {
         List<FeatureTT> features = featureTTService.getFeaturesBySprint(sprintId);
 
-        if (features.isEmpty()) {
-            taskDrafts.remove(chatId);
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId,
-                    "⚠️ This sprint has no features. Create a feature first before adding a task.",
-                    telegramClient, null);
-            showMainMenu();
-            return;
-        }
-
         var builder = InlineKeyboardMarkup.builder();
         for (FeatureTT f : features) {
             builder.keyboardRow(new InlineKeyboardRow(
@@ -968,6 +958,11 @@ public class BotActions {
                             .callbackData("FEATURE:" + f.getFeatureId())
                             .build()));
         }
+        builder.keyboardRow(new InlineKeyboardRow(
+                InlineKeyboardButton.builder()
+                        .text("❌ Sin feature")
+                        .callbackData("FEATURE:none")
+                        .build()));
         builder.keyboardRow(new InlineKeyboardRow(
                 InlineKeyboardButton.builder().text("❌ Cancel").callbackData("CANCEL").build()));
 
@@ -994,12 +989,16 @@ public class BotActions {
         }
 
         String featureToken = requestText.substring(8);
-        try {
-            draft.setFeatureId(Long.parseLong(featureToken));
-        } catch (NumberFormatException e) {
-            showFeatureSelectionForSprint(draft.getSprintId());
-            exit = true;
-            return;
+        if ("none".equals(featureToken)) {
+            draft.setFeatureId(null);
+        } else {
+            try {
+                draft.setFeatureId(Long.parseLong(featureToken));
+            } catch (NumberFormatException e) {
+                showFeatureSelectionForSprint(draft.getSprintId());
+                exit = true;
+                return;
+            }
         }
 
         saveTaskFromDraft(draft);

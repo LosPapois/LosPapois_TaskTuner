@@ -386,6 +386,49 @@ class BotActionsTest {
         verifyNoInteractions(telegramClient);
     }
 
+    @Test
+    @DisplayName("Task creation: FEATURE:none sets featureId to null")
+    void taskCreation_featureNone_sets_null_featureId() throws Exception {
+        authenticate(user);
+
+        actions("/addtask").fnAddItem();
+        actions("Implement login").fnPendingConversation();
+        actions("Build a login page").fnPendingConversation();
+        actions("8").fnPendingConversation();
+        actions("PRIO:high").fnPendingConversation();
+        clearInvocations(telegramClient);
+        actions("SPRINT:1").fnPendingConversation();
+        assertEquals(BotConversationState.WAITING_NEW_ITEM_FEATURE, conversationState());
+
+        clearInvocations(telegramClient);
+        actions("FEATURE:none").fnPendingConversation();
+
+        ArgumentCaptor<TaskTT> captor = ArgumentCaptor.forClass(TaskTT.class);
+        verify(taskTTService).addTask(captor.capture());
+        assertNull(captor.getValue().getFeatureId());
+    }
+
+    @Test
+    @DisplayName("Task creation: feature selection keyboard includes 'Sin feature' button")
+    void taskCreation_featureSelection_includes_sinFeature_button() throws Exception {
+        authenticate(user);
+
+        actions("/addtask").fnAddItem();
+        actions("My task").fnPendingConversation();
+        actions("Desc").fnPendingConversation();
+        actions("3").fnPendingConversation();
+        actions("PRIO:medium").fnPendingConversation();
+        clearInvocations(telegramClient);
+        actions("SPRINT:1").fnPendingConversation();
+
+        boolean hasSinFeature = sentMessages().stream().anyMatch(msg -> {
+            if (!(msg.getReplyMarkup() instanceof InlineKeyboardMarkup kb)) return false;
+            return kb.getKeyboard().stream().flatMap(List::stream)
+                    .anyMatch(btn -> btn.getCallbackData().equals("FEATURE:none"));
+        });
+        assertTrue(hasSinFeature, "Feature selection keyboard must include FEATURE:none button");
+    }
+
     private BotActions actions(String requestText) {
         BotActions botActions = new BotActions(telegramClient, todoService, deepSeekService, groqService,
                 userTTService, sprintTTService, projectTTService, projectUserTTService, sprintTaskTTService,
