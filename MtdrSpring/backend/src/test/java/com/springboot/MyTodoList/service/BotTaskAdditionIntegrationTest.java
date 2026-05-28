@@ -378,6 +378,57 @@ class BotActionsTest {
     }
 
     @Test
+    @DisplayName("Edit task feature: shows sprint features as keyboard options")
+    void editTaskFeature_shows_feature_selection_keyboard() throws Exception {
+        authenticate(user);
+        actions("EDIT_PICK:55").fnEditPickTask();
+        clearInvocations(telegramClient);
+
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+
+        assertEquals(BotConversationState.WAITING_EDIT_TASK_NEW_FEATURE, conversationState());
+        boolean hasFeatureButton = sentMessages().stream().anyMatch(msg -> {
+            if (!(msg.getReplyMarkup() instanceof InlineKeyboardMarkup kb)) return false;
+            return kb.getKeyboard().stream().flatMap(List::stream)
+                    .anyMatch(btn -> btn.getCallbackData().equals("EDIT_TASK_FEAT:" + FEATURE_ID));
+        });
+        assertTrue(hasFeatureButton, "Feature selection must include EDIT_TASK_FEAT:{id} button");
+    }
+
+    @Test
+    @DisplayName("Edit task feature: EDIT_TASK_FEAT:none sets featureId to null")
+    void editTaskFeature_none_sets_featureId_null() throws Exception {
+        authenticate(user);
+        actions("EDIT_PICK:55").fnEditPickTask();
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+        clearInvocations(telegramClient);
+
+        actions("EDIT_TASK_FEAT:none").fnPendingConversation();
+
+        ArgumentCaptor<TaskTT> captor = ArgumentCaptor.forClass(TaskTT.class);
+        verify(taskTTService).updateTask(eq(TASK_ID), captor.capture());
+        assertNull(captor.getValue().getFeatureId());
+        assertNull(conversationState());
+    }
+
+    @Test
+    @DisplayName("Edit task feature: EDIT_TASK_FEAT:{id} updates featureId and confirms")
+    void editTaskFeature_id_updates_featureId() throws Exception {
+        authenticate(user);
+        actions("EDIT_PICK:55").fnEditPickTask();
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+        clearInvocations(telegramClient);
+
+        actions("EDIT_TASK_FEAT:" + FEATURE_ID).fnPendingConversation();
+
+        ArgumentCaptor<TaskTT> captor = ArgumentCaptor.forClass(TaskTT.class);
+        verify(taskTTService).updateTask(eq(TASK_ID), captor.capture());
+        assertEquals(FEATURE_ID, captor.getValue().getFeatureId());
+        assertNull(conversationState());
+        assertTrue(sentMessages().stream().anyMatch(msg -> msg.getText().contains("Feature updated")));
+    }
+
+    @Test
     @DisplayName("fnDone and fnDelete remain safe no-ops")
     void fnDone_and_fnDelete_are_safe_noops() throws Exception {
         BotActions doneActions = actions("/done");
