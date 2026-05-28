@@ -9,6 +9,7 @@ import com.springboot.MyTodoList.model.UserTT;
 import com.springboot.MyTodoList.util.BotActions;
 import com.springboot.MyTodoList.util.BotConversationState;
 import com.springboot.MyTodoList.util.BotMessages;
+import com.springboot.MyTodoList.util.BotTaskDraft;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,11 +26,13 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -478,6 +481,35 @@ class BotActionsTest {
                     .anyMatch(btn -> btn.getCallbackData().equals("FEATURE:none"));
         });
         assertTrue(hasSinFeature, "Feature selection keyboard must include FEATURE:none button");
+    }
+
+    @Test
+    @DisplayName("Edit task feature: task with no sprint shows error and clears state")
+    void editTaskFeature_noSprint_showsError() throws Exception {
+        authenticate(user);
+
+        // Given: a task with no sprint links
+        TaskTT task = new TaskTT();
+        task.setTaskId(99L);
+        task.setUserId(1L);
+        when(taskTTService.getTaskById(99L)).thenReturn(Optional.of(task));
+        when(sprintTaskTTService.getSprintsForTask(99L)).thenReturn(Collections.emptyList());
+
+        // Set up draft pointing to task 99 and state WAITING_EDIT_TASK_FIELD
+        BotTaskDraft draft = new BotTaskDraft();
+        draft.setTaskId(99L);
+        this.<Long, BotTaskDraft>staticMap("taskDrafts").put(CHAT_ID, draft);
+        this.<Long, BotConversationState>staticMap("chatStates").put(CHAT_ID, BotConversationState.WAITING_EDIT_TASK_FIELD);
+
+        // Trigger EDIT_FIELD:feature via fnPendingConversation (same pattern as other edit tests)
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+
+        // Verify error message sent
+        assertTrue(sentMessages().stream().anyMatch(msg ->
+                msg.getChatId().equals(String.valueOf(CHAT_ID)) &&
+                msg.getText().contains("Could not find sprint")));
+        // State should not be WAITING_EDIT_TASK_NEW_FEATURE
+        assertNotEquals(BotConversationState.WAITING_EDIT_TASK_NEW_FEATURE, conversationState());
     }
 
     private BotActions actions(String requestText) {
