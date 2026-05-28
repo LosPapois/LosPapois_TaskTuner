@@ -333,6 +333,18 @@ class BotActionsTest {
     }
 
     @Test
+    @DisplayName("EDIT_FIELD:feature transitions to WAITING_EDIT_TASK_NEW_FEATURE")
+    void editField_feature_transitions_to_waiting_state() throws Exception {
+        authenticate(user);
+        actions("EDIT_PICK:55").fnEditPickTask();
+
+        clearInvocations(telegramClient);
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+
+        assertEquals(BotConversationState.WAITING_EDIT_TASK_NEW_FEATURE, conversationState());
+    }
+
+    @Test
     @DisplayName("fnAsk, fnAiCreate, fnAddFeature, fnImportTasks, fnLLM and fnElse start their chatbot flows")
     void chatbot_entrypoints_start_their_flows() throws Exception {
         authenticate(user);
