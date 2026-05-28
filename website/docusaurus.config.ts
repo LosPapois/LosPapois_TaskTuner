@@ -13,8 +13,8 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'http://localhost',
-  baseUrl: '/',
+  url: 'https://lospapois.github.io',
+  baseUrl: '/LosPapois_TaskTuner/',
 
   organizationName: 'LosPapois',
   projectName: 'LosPapois_TaskTuner',
