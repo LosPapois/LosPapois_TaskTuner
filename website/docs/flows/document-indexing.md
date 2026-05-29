@@ -6,29 +6,22 @@ title: Indexación de Documentos
 
 # Flujo de Indexación de Documentos
 
-```
-Usuario sube PDF/DOCX/TXT al bot (clip 📎)
-        │
-        ▼
-DocumentProcessingService.processDocument(fileId, fileName, chatId)
-    ├── Descarga archivo de Telegram API
-    ├── Extrae texto: PDFBox (PDF) / Apache POI (DOCX) / plain (TXT)
-    ├── Guarda CLOB en DOCUMENT_TT (Oracle)
-    └── VectorService.deleteChunksForDoc(docId)  ← limpia re-uploads
-        VectorService.indexDocument(docId, pjId, text)
-            │
-            ├─ chunkSemantic(text)
-            │   ├── Split por párrafos (\n\n) → unidades semánticas
-            │   ├── Merge párrafos cortos hasta 800 chars
-            │   └── Fallback overlap (80 chars) para párrafos gigantes
-            │
-            └─ por cada chunk:
-                embed(chunk) → Cohere search_document → float[1024]
-                INSERT INTO rag_chunks (doc_id, pj_id, content, embedding)
-                VALUES (?, ?, ?, ?)  ← OracleType.VECTOR con float[]
-        │
-        ▼
-"✅ Document indexed! X chunks stored."
+```mermaid
+flowchart TD
+    Upload([Usuario sube PDF/DOCX/TXT 📎]) --> Process["DocumentProcessingService\n.processDocument(fileId, fileName, chatId)"]
+    Process --> Download["Descarga archivo\nde Telegram API"]
+    Download --> Extract{Tipo de archivo}
+    Extract -->|PDF| PDFBox["Apache PDFBox 3.0.3"]
+    Extract -->|DOCX| POI["Apache POI 5.3.0"]
+    Extract -->|TXT| Plain["Java plain text"]
+    PDFBox --> SaveClob["Guarda CLOB en DOCUMENT_TT\nOracle"]
+    POI --> SaveClob
+    Plain --> SaveClob
+    SaveClob --> Delete["VectorService.deleteChunksForDoc\nlimpia re-uploads"]
+    Delete --> Chunk["chunkSemantic(text)\nsplit por párrafos\nmerge hasta 800 chars\nfallback overlap 80 chars"]
+    Chunk --> EmbedLoop["por cada chunk:\nCohere search_document → float[1024]"]
+    EmbedLoop --> Insert["INSERT INTO rag_chunks\nOracleType.VECTOR con float[]"]
+    Insert --> Done(["✅ Document indexed!\nX chunks stored."])
 ```
 
 ## Formatos soportados
@@ -41,4 +34,4 @@ DocumentProcessingService.processDocument(fileId, fileName, chatId)
 
 ## Re-upload
 
-Al subir un documento que ya existe, `deleteChunksForDoc(docId)` elimina los chunks anteriores antes de indexar — evita duplicados en la búsqueda vectorial.
+Al subir documento ya existente, `deleteChunksForDoc(docId)` elimina chunks anteriores antes de indexar — evita duplicados en búsqueda vectorial.

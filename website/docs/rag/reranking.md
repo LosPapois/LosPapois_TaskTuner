@@ -18,14 +18,28 @@ MAX_BONUS      = 0.30
 
 ## Ejemplo
 
-```
-chunk A: dist=0.30, no contiene keywords  → adjusted = 0.30
-chunk B: dist=0.35, contiene 3 keywords   → adjusted = 0.35 - (3 × 0.08) = 0.11
-chunk B sube al top aunque su vector sea "peor"
+```mermaid
+flowchart LR
+    subgraph Input
+        A["chunk A\ndist=0.30\nsin keywords"]
+        B["chunk B\ndist=0.35\n3 keywords exactas"]
+    end
+    subgraph Adjusted
+        AR["chunk A\nadjusted=0.30"]
+        BR["chunk B\nadjusted=0.11\n0.35 - 3×0.08"]
+    end
+    subgraph Ranking
+        R1["🥇 chunk B"]
+        R2["🥈 chunk A"]
+    end
+    A --> AR
+    B --> BR
+    AR --> R2
+    BR --> R1
 ```
 
 `MAX_KEYWORD_BONUS = 0.30` evita que un chunk con muchas keywords triviales supere a uno vectorialmente muy relevante.
 
 ## Extracción de keywords
 
-`extractKeywords(query)` filtra stopwords en español e inglés antes de calcular hits — palabras como _"el"_, _"de"_, _"the"_ no cuentan como hits.
+`extractKeywords(query)` filtra stopwords en español e inglés antes de calcular hits — palabras como *"el"*, *"de"*, *"the"* no cuentan como hits.

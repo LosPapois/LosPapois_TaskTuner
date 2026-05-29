@@ -16,14 +16,16 @@ title: Chunking Semántico
 
 Split por párrafos (`\n\n`) + merge hasta 800 chars + fallback con overlap para párrafos gigantes.
 
-```
-Texto original:
-"Hito 1: Validación del software\n\nHito 2: Documentación\n\nHito 3: Entrega final"
-
-Chunking fijo (500 chars):          Chunking semántico:
-["Hito 1: Validación del            ["Hito 1: Validación del software",
-  software\n\nHito 2: Docu           "Hito 2: Documentación",
-  mentación\n\nHito 3: En..."]       "Hito 3: Entrega final"]
+```mermaid
+flowchart TD
+    Text([Texto del documento]) --> Split["Split por párrafos\n\\n\\n"]
+    Split --> Merge{"párrafo < 800 chars\ny hay siguiente?"}
+    Merge -->|Sí| MergeOp["Merge con siguiente párrafo"]
+    MergeOp --> Merge
+    Merge -->|No| CheckSize{"párrafo > 800 chars?"}
+    CheckSize -->|Sí| Overlap["Fallback: split con\noverlap 80 chars"]
+    CheckSize -->|No| Chunk["✅ Chunk semántico\n≤ 800 chars"]
+    Overlap --> Chunk
 ```
 
 Cada chunk semántico es una unidad coherente — mejora tanto la calidad del embedding como la legibilidad en el prompt del LLM.
