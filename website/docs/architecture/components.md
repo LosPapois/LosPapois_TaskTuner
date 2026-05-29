@@ -10,12 +10,12 @@ title: Componentes
 
 ```mermaid
 flowchart TB
-    subgraph CLIENTE
+    subgraph CLIENTE["🖥️ Cliente"]
         Browser["🌐 Browser\nReact SPA"]
         Telegram["📱 Telegram\nBot"]
     end
 
-    subgraph SPRING["Spring Boot :8080"]
+    subgraph SPRING["⚙️ Spring Boot :8080"]
         direction TB
         subgraph REST["REST Controllers"]
             Auth[AuthController]
@@ -51,12 +51,12 @@ flowchart TB
         end
     end
 
-    subgraph EXTERNAL["APIs Externas"]
+    subgraph EXTERNAL["🌐 APIs Externas"]
         GroqAPI["Groq API\nLlama 3.3 70B"]
         CohereAPI["Cohere API\nembed-multilingual-v3.0"]
     end
 
-    subgraph DB["Oracle Database 23ai"]
+    subgraph DB["🗄️ Oracle Database 23ai"]
         Relational["Tablas relacionales\nUSER_TT, PROJECT_TT, TASK_TT..."]
         Vector2["RAG_CHUNKS\nVECTOR(1024, FLOAT32)\nHNSW Index"]
     end
@@ -72,6 +72,22 @@ flowchart TB
     Vector -->|JDBC OracleType.VECTOR| Vector2
     REST --> SVC
     SVC -->|JPA| Relational
+
+    classDef client fill:#DBEAFE,stroke:#2563EB,color:#1E3A5F
+    classDef spring fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    classDef bot fill:#EDE9FE,stroke:#7C3AED,color:#3B0764
+    classDef svc fill:#FEF9C3,stroke:#CA8A04,color:#713F12
+    classDef sec fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D
+    classDef ext fill:#FFEDD5,stroke:#EA580C,color:#7C2D12
+    classDef db fill:#F3E8FF,stroke:#9333EA,color:#3B0764
+
+    class Browser,Telegram client
+    class Auth,TaskC,SprintC,ProjC,FeatC,DocC,UserC,KpiC spring
+    class BotCtrl,BotAct,Groq,Vector,DocProc bot
+    class US,TS,SS,PS,FS,DS svc
+    class JWT,WebSec sec
+    class GroqAPI,CohereAPI ext
+    class Relational,Vector2 db
 ```
 
 ## Componentes del Bot

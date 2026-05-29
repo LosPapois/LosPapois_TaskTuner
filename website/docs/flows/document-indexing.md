@@ -22,6 +22,22 @@ flowchart TD
     Chunk --> EmbedLoop["por cada chunk:\nCohere search_document → float[1024]"]
     EmbedLoop --> Insert["INSERT INTO rag_chunks\nOracleType.VECTOR con float[]"]
     Insert --> Done(["✅ Document indexed!\nX chunks stored."])
+
+    classDef trigger fill:#DBEAFE,stroke:#2563EB,color:#1E3A5F
+    classDef process fill:#F3F4F6,stroke:#6B7280,color:#111827
+    classDef extractor fill:#FFEDD5,stroke:#EA580C,color:#7C2D12
+    classDef oracle fill:#F3E8FF,stroke:#9333EA,color:#3B0764
+    classDef cohere fill:#FEF9C3,stroke:#CA8A04,color:#713F12
+    classDef done fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    classDef decision fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D
+
+    class Upload trigger
+    class Process,Download,Delete process
+    class Extract decision
+    class PDFBox,POI,Plain extractor
+    class SaveClob,Insert oracle
+    class Chunk,EmbedLoop cohere
+    class Done done
 ```
 
 ## Formatos soportados

@@ -20,15 +20,15 @@ MAX_BONUS      = 0.30
 
 ```mermaid
 flowchart LR
-    subgraph Input
+    subgraph Input["Distancia vectorial"]
         A["chunk A\ndist=0.30\nsin keywords"]
         B["chunk B\ndist=0.35\n3 keywords exactas"]
     end
-    subgraph Adjusted
+    subgraph Adjusted["Score ajustado"]
         AR["chunk A\nadjusted=0.30"]
         BR["chunk B\nadjusted=0.11\n0.35 - 3×0.08"]
     end
-    subgraph Ranking
+    subgraph Ranking["Ranking final"]
         R1["🥇 chunk B"]
         R2["🥈 chunk A"]
     end
@@ -36,6 +36,18 @@ flowchart LR
     B --> BR
     AR --> R2
     BR --> R1
+
+    classDef worse fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D
+    classDef better fill:#DBEAFE,stroke:#2563EB,color:#1E3A5F
+    classDef adj fill:#F3F4F6,stroke:#6B7280,color:#111827
+    classDef gold fill:#FEF9C3,stroke:#CA8A04,color:#713F12
+    classDef silver fill:#F3F4F6,stroke:#6B7280,color:#374151
+
+    class A worse
+    class B better
+    class AR,BR adj
+    class R1 gold
+    class R2 silver
 ```
 
 `MAX_KEYWORD_BONUS = 0.30` evita que un chunk con muchas keywords triviales supere a uno vectorialmente muy relevante.

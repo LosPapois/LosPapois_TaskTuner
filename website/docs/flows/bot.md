@@ -20,6 +20,18 @@ flowchart TD
     Auth -->|Sí| Dispatch{Tipo de input}
     Dispatch -->|Comando de texto| Cmd["/start, /addtask, /ask, /uploaddoc..."]
     Dispatch -->|Estado activo| State["Máquina de estados\nWAITING_NEW_ITEM_NAME\n→ WAITING_NEW_ITEM_SP\n→ ..."]
+
+    classDef trigger fill:#DBEAFE,stroke:#2563EB,color:#1E3A5F
+    classDef process fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    classDef decision fill:#FEF9C3,stroke:#CA8A04,color:#713F12
+    classDef state fill:#EDE9FE,stroke:#7C3AED,color:#3B0764
+    classDef error fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D
+
+    class Msg,Ctrl trigger
+    class Exec,Process,Chain,Sentinel process
+    class HasDoc,Auth,Dispatch decision
+    class Cmd,State state
+    class LoginScreen error
 ```
 
 ## Concurrencia por chat
@@ -38,7 +50,13 @@ flowchart LR
     N4[WAITING_NEW_ITEM_PRIORITY]
     N5[WAITING_NEW_ITEM_FEATURE]
     N6[WAITING_NEW_ITEM_SPRINT]
-    Done([tarea creada])
+    Done([tarea creada ✅])
 
     N1 --> N2 --> N3 --> N4 --> N5 --> N6 --> Done
+
+    classDef step fill:#EDE9FE,stroke:#7C3AED,color:#3B0764
+    classDef done fill:#DCFCE7,stroke:#16A34A,color:#14532D
+
+    class N1,N2,N3,N4,N5,N6 step
+    class Done done
 ```
