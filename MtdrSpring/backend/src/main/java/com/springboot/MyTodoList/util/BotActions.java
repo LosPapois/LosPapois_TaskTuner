@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -64,6 +65,8 @@ public class BotActions {
     String telegramIdentity;
     TelegramClient telegramClient;
     boolean exit;
+    /** Cached result of getUserProjectId() — valid for the lifetime of this request instance. */
+    private Long cachedProjectId;
 
     ToDoItemService todoService;
     DeepSeekService deepSeekService;
@@ -837,9 +840,12 @@ public class BotActions {
     private long getUserProjectId() {
         if (!isUserAuthenticated())
             return 0;
-        UserTT user = getAuthenticatedUser();
-        List<ProjectUserTT> memberships = projectUserTTService.getProjectsForUser(user.getUserId());
-        return memberships.isEmpty() ? 0 : memberships.get(0).getPjId();
+        if (cachedProjectId == null) {
+            UserTT user = getAuthenticatedUser();
+            List<ProjectUserTT> memberships = projectUserTTService.getProjectsForUser(user.getUserId());
+            cachedProjectId = memberships.isEmpty() ? 0L : memberships.get(0).getPjId();
+        }
+        return cachedProjectId;
     }
 
     private List<SprintTT> getAvailableSprints() {
@@ -1504,27 +1510,89 @@ public class BotActions {
         BotHelper.sendMessageToTelegramButtons(chatId, prompt, telegramClient, keyboard);
     }
 
-    private void handleEditTaskNewName() {
+    // ─── Edit-flow shared helpers ────────────────────────────────────────
+
+    /**
+     * Clears conversation state, sends an optional confirm message, shows the
+     * main menu, and sets exit=true. Used at every successful terminal path.
+     */
+    private void finishWithMenu(String confirmMsg) {
+        clearConversationState();
+        if (confirmMsg != null)
+            BotHelper.sendMessageToTelegram(chatId, confirmMsg, telegramClient, null);
+        showMainMenu();
+        exit = true;
+    }
+
+    /**
+     * Resolves the current edit-task draft → TaskTT.
+     * On any failure: clears state, sends error, sets exit=true, returns empty.
+     */
+    private Optional<TaskTT> resolveEditTask() {
         BotTaskDraft draft = taskDrafts.get(chatId);
         if (draft == null || draft.getTaskId() == null) {
             clearConversationState();
             BotHelper.sendMessageToTelegram(chatId, "Error. Please try again with /edittask.", telegramClient, null);
             exit = true;
-            return;
+            return Optional.empty();
         }
-        TaskTT task = taskTTService.getTaskById(draft.getTaskId()).orElse(null);
-        if (task == null) {
+        Optional<TaskTT> task = taskTTService.getTaskById(draft.getTaskId());
+        if (task.isEmpty()) {
             clearConversationState();
             BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
             exit = true;
-            return;
         }
-        task.setNameTask(requestText.trim());
-        taskTTService.updateTask(task.getTaskId(), task);
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(chatId, "✅ Task name updated!", telegramClient, null);
-        showMainMenu();
+        return task;
+    }
+
+    /**
+     * Resolves the current edit-feature draft → FeatureTT.
+     * On any failure: clears state, sends error, sets exit=true, returns empty.
+     */
+    private Optional<FeatureTT> resolveEditFeature() {
+        BotFeatureDraft draft = featureDrafts.get(chatId);
+        if (draft == null || draft.getFeatureId() == null) {
+            clearConversationState();
+            BotHelper.sendMessageToTelegram(chatId, "Error. Try again with /editfeature.", telegramClient, null);
+            exit = true;
+            return Optional.empty();
+        }
+        Optional<FeatureTT> feature = featureTTService.getFeatureById(draft.getFeatureId());
+        if (feature.isEmpty()) {
+            clearConversationState();
+            BotHelper.sendMessageToTelegram(chatId, "Feature not found.", telegramClient, null);
+            exit = true;
+        }
+        return feature;
+    }
+
+    /**
+     * Generic task-edit helper: resolve draft → apply mutation → persist → finish.
+     * Covers all simple field edits (name, description, SP, priority, feature).
+     */
+    private void applyTaskEdit(Consumer<TaskTT> mutator, String confirmMsg) {
+        resolveEditTask().ifPresent(task -> {
+            mutator.accept(task);
+            taskTTService.updateTask(task.getTaskId(), task);
+            finishWithMenu(confirmMsg);
+        });
         exit = true;
+    }
+
+    /**
+     * Generic feature-edit helper: resolve draft → apply mutation → persist → finish.
+     */
+    private void applyFeatureEdit(Consumer<FeatureTT> mutator, String confirmMsg) {
+        resolveEditFeature().ifPresent(feature -> {
+            mutator.accept(feature);
+            featureTTService.updateFeature(feature.getFeatureId(), feature);
+            finishWithMenu(confirmMsg);
+        });
+        exit = true;
+    }
+
+    private void handleEditTaskNewName() {
+        applyTaskEdit(task -> task.setNameTask(requestText.trim()), "✅ Task name updated!");
     }
 
     private void handleEditTaskNewDescription() {
@@ -1534,55 +1602,17 @@ public class BotActions {
             exit = true;
             return;
         }
-        BotTaskDraft draft = taskDrafts.get(chatId);
-        if (draft == null || draft.getTaskId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Please try again with /edittask.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        TaskTT task = taskTTService.getTaskById(draft.getTaskId()).orElse(null);
-        if (task == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        task.setInfoTask(input);
-        taskTTService.updateTask(task.getTaskId(), task);
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(chatId, "✅ Task description updated!", telegramClient, null);
-        showMainMenu();
-        exit = true;
+        applyTaskEdit(task -> task.setInfoTask(input), "✅ Task description updated!");
     }
 
     private void handleEditTaskNewSP() {
-        BotTaskDraft draft = taskDrafts.get(chatId);
-        if (draft == null || draft.getTaskId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Please try again with /edittask.", telegramClient, null);
-            exit = true;
-            return;
-        }
         try {
             int sp = Integer.parseInt(requestText.trim());
-            TaskTT task = taskTTService.getTaskById(draft.getTaskId()).orElse(null);
-            if (task == null) {
-                clearConversationState();
-                BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
-                exit = true;
-                return;
-            }
-            task.setStoryPoints(sp);
-            taskTTService.updateTask(task.getTaskId(), task);
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "✅ Story points updated!", telegramClient, null);
-            showMainMenu();
+            applyTaskEdit(task -> task.setStoryPoints(sp), "✅ Story points updated!");
         } catch (NumberFormatException e) {
-            BotHelper.sendMessageToTelegram(chatId, BotMessages.INVALID_STORY_POINTS.getMessage(), telegramClient,
-                    null);
+            BotHelper.sendMessageToTelegram(chatId, BotMessages.INVALID_STORY_POINTS.getMessage(), telegramClient, null);
+            exit = true;
         }
-        exit = true;
     }
 
     private void handleEditTaskNewPriority() {
@@ -1605,27 +1635,7 @@ public class BotActions {
             exit = true;
             return;
         }
-        BotTaskDraft draft = taskDrafts.get(chatId);
-        if (draft == null || draft.getTaskId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Please try again with /edittask.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        TaskTT task = taskTTService.getTaskById(draft.getTaskId()).orElse(null);
-        if (task == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        task.setPriority(priority);
-        taskTTService.updateTask(task.getTaskId(), task);
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(chatId, "✅ Priority updated to " + prioEmoji(priority) + "!", telegramClient,
-                null);
-        showMainMenu();
-        exit = true;
+        applyTaskEdit(task -> task.setPriority(priority), "✅ Priority updated to " + prioEmoji(priority) + "!");
     }
 
     private void handleEditTaskNewSprint() {
@@ -1634,7 +1644,6 @@ public class BotActions {
             exit = true;
             return;
         }
-
         long newSprintId;
         try {
             newSprintId = Long.parseLong(requestText.substring(7));
@@ -1644,26 +1653,19 @@ public class BotActions {
             return;
         }
 
-        BotTaskDraft draft = taskDrafts.get(chatId);
-        if (draft == null || draft.getTaskId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Please try again with /edittask.", telegramClient, null);
-            exit = true;
-            return;
-        }
+        Optional<TaskTT> taskOpt = resolveEditTask();
+        if (taskOpt.isEmpty()) return; // exit already set
 
-        TaskTT task = taskTTService.getTaskById(draft.getTaskId()).orElse(null);
+        TaskTT task = taskOpt.get();
         SprintTT newSprint = sprintTTService.getSprintById(newSprintId).orElse(null);
-        if (task == null || newSprint == null) {
+        if (newSprint == null) {
             clearConversationState();
             BotHelper.sendMessageToTelegram(chatId, "Task or sprint not found.", telegramClient, null);
             exit = true;
             return;
         }
 
-        List<SprintTaskTT> currentSprints = sprintTaskTTService
-                .getSprintsForTask(task.getTaskId());
-
+        List<SprintTaskTT> currentSprints = sprintTaskTTService.getSprintsForTask(task.getTaskId());
         try {
             sprintTaskTTService.moveTaskToSprint(task.getTaskId(), currentSprints, newSprintId);
         } catch (Exception e) {
@@ -1677,25 +1679,18 @@ public class BotActions {
         task.setDateStartTask(newSprint.getDateStartSpr());
         task.setDateEndSetTask(newSprint.getDateEndSpr());
         taskTTService.updateTask(task.getTaskId(), task);
-
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(
-                chatId, "🔄 Task moved to *" + newSprint.getNameSprint() + "* successfully!", telegramClient, null);
-        showMainMenu();
-        exit = true;
+        finishWithMenu("🔄 Task moved to *" + newSprint.getNameSprint() + "* successfully!");
     }
 
     private void handleEditTaskNewFeature() {
         if (!requestText.startsWith("EDIT_TASK_FEAT:")) {
             BotTaskDraft draft = taskDrafts.get(chatId);
             if (draft != null && draft.getTaskId() != null) {
-                List<SprintTaskTT> links =
-                        sprintTaskTTService.getSprintsForTask(draft.getTaskId());
+                List<SprintTaskTT> links = sprintTaskTTService.getSprintsForTask(draft.getTaskId());
                 long sprId = links.isEmpty() ? 0L : links.get(0).getSprId();
                 if (sprId == 0L) {
                     clearConversationState();
-                    BotHelper.sendMessageToTelegram(chatId,
-                            "⚠️ Could not find sprint for this task.", telegramClient, null);
+                    BotHelper.sendMessageToTelegram(chatId, "⚠️ Could not find sprint for this task.", telegramClient, null);
                     showMainMenu();
                 } else {
                     showFeatureSelectionForTaskEdit(sprId);
@@ -1705,43 +1700,26 @@ public class BotActions {
             return;
         }
 
-        BotTaskDraft draft = taskDrafts.get(chatId);
-        if (draft == null || draft.getTaskId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Please try again with /edittask.", telegramClient, null);
-            exit = true;
-            return;
-        }
-
-        TaskTT task = taskTTService.getTaskById(draft.getTaskId()).orElse(null);
-        if (task == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
-            exit = true;
-            return;
-        }
-
         String featureToken = requestText.substring(15);
+        final Long featureId;
         if ("none".equals(featureToken)) {
-            task.setFeatureId(null);
+            featureId = null;
         } else {
             try {
-                task.setFeatureId(Long.parseLong(featureToken));
+                featureId = Long.parseLong(featureToken);
             } catch (NumberFormatException e) {
-                List<SprintTaskTT> links =
-                        sprintTaskTTService.getSprintsForTask(draft.getTaskId());
-                long sprId = links.isEmpty() ? 0L : links.get(0).getSprId();
-                showFeatureSelectionForTaskEdit(sprId);
+                Optional<TaskTT> taskOpt = resolveEditTask();
+                if (taskOpt.isPresent()) {
+                    List<SprintTaskTT> links = sprintTaskTTService.getSprintsForTask(taskOpt.get().getTaskId());
+                    long sprId = links.isEmpty() ? 0L : links.get(0).getSprId();
+                    showFeatureSelectionForTaskEdit(sprId);
+                }
                 exit = true;
                 return;
             }
         }
 
-        taskTTService.updateTask(task.getTaskId(), task);
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(chatId, "✅ Feature updated!", telegramClient, null);
-        showMainMenu();
-        exit = true;
+        applyTaskEdit(task -> task.setFeatureId(featureId), "✅ Feature updated!");
     }
 
     // ─── Feature edit flow ───────────────────────────────────────────────
@@ -1865,26 +1843,7 @@ public class BotActions {
     }
 
     private void handleEditFeatureNewName() {
-        BotFeatureDraft draft = featureDrafts.get(chatId);
-        if (draft == null || draft.getFeatureId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Try again with /editfeature.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        FeatureTT feature = featureTTService.getFeatureById(draft.getFeatureId()).orElse(null);
-        if (feature == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Feature not found.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        feature.setNameFeature(requestText.trim());
-        featureTTService.updateFeature(feature.getFeatureId(), feature);
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(chatId, "✅ Feature name updated!", telegramClient, null);
-        showMainMenu();
-        exit = true;
+        applyFeatureEdit(f -> f.setNameFeature(requestText.trim()), "✅ Feature name updated!");
     }
 
     private void handleEditFeatureNewDescription() {
@@ -1894,26 +1853,7 @@ public class BotActions {
             exit = true;
             return;
         }
-        BotFeatureDraft draft = featureDrafts.get(chatId);
-        if (draft == null || draft.getFeatureId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Try again with /editfeature.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        FeatureTT feature = featureTTService.getFeatureById(draft.getFeatureId()).orElse(null);
-        if (feature == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Feature not found.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        feature.setDescriptionFeature(input);
-        featureTTService.updateFeature(feature.getFeatureId(), feature);
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(chatId, "✅ Feature description updated!", telegramClient, null);
-        showMainMenu();
-        exit = true;
+        applyFeatureEdit(f -> f.setDescriptionFeature(input), "✅ Feature description updated!");
     }
 
     private void handleEditFeatureNewPriority() {
@@ -1936,27 +1876,7 @@ public class BotActions {
             exit = true;
             return;
         }
-        BotFeatureDraft draft = featureDrafts.get(chatId);
-        if (draft == null || draft.getFeatureId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Try again with /editfeature.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        FeatureTT feature = featureTTService.getFeatureById(draft.getFeatureId()).orElse(null);
-        if (feature == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Feature not found.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        feature.setPriorityFeature(priority);
-        featureTTService.updateFeature(feature.getFeatureId(), feature);
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(chatId, "✅ Priority updated to " + prioEmoji(priority) + "!", telegramClient,
-                null);
-        showMainMenu();
-        exit = true;
+        applyFeatureEdit(f -> f.setPriorityFeature(priority), "✅ Priority updated to " + prioEmoji(priority) + "!");
     }
 
     private void handleEditFeatureNewSprint() {
@@ -1973,28 +1893,18 @@ public class BotActions {
             exit = true;
             return;
         }
-        BotFeatureDraft draft = featureDrafts.get(chatId);
-        if (draft == null || draft.getFeatureId() == null) {
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId, "Error. Try again with /editfeature.", telegramClient, null);
-            exit = true;
-            return;
-        }
-        FeatureTT feature = featureTTService.getFeatureById(draft.getFeatureId()).orElse(null);
+
+        Optional<FeatureTT> featureOpt = resolveEditFeature();
+        if (featureOpt.isEmpty()) return; // exit already set
+
         SprintTT newSprint = sprintTTService.getSprintById(newSprintId).orElse(null);
-        if (feature == null || newSprint == null) {
+        if (newSprint == null) {
             clearConversationState();
             BotHelper.sendMessageToTelegram(chatId, "Feature or sprint not found.", telegramClient, null);
             exit = true;
             return;
         }
-        feature.setSprId(newSprintId);
-        featureTTService.updateFeature(feature.getFeatureId(), feature);
-        clearConversationState();
-        BotHelper.sendMessageToTelegram(chatId,
-                "🔄 Feature moved to *" + newSprint.getNameSprint() + "* successfully!", telegramClient, null);
-        showMainMenu();
-        exit = true;
+        applyFeatureEdit(f -> f.setSprId(newSprintId), "🔄 Feature moved to *" + newSprint.getNameSprint() + "* successfully!");
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────
