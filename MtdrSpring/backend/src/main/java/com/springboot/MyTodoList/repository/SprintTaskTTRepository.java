@@ -102,4 +102,13 @@ public interface SprintTaskTTRepository extends JpaRepository<SprintTaskTT, Spri
     @Query("SELECT COUNT(st) FROM SprintTaskTT st JOIN TaskTT t ON t.taskId = st.id.taskId " +
            "WHERE t.featureId = :featureId AND st.stateTask = 'done'")
     long countDoneTasksByFeatureId(@Param("featureId") long featureId);
+
+    /*
+     * Count how many previous sprints include a given task.
+     * Used to populate the carriedOver flag: if count > 0, task is carried over.
+     *
+     * Generated SQL (effectively):
+     *   SELECT COUNT(*) FROM sprint_task_tt WHERE task_id = ? AND spr_id < ?
+     */
+    long countByIdTaskIdAndIdSprIdLessThan(long taskId, long sprId);
 }

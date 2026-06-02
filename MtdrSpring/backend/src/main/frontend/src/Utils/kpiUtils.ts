@@ -37,6 +37,12 @@ export function taskWeight(t: { priority?: string | null; storyPoints?: number |
 /**
  * Derive the four sprint KPIs from the joined task list.
  * progress and carryRate use weighted SP × priority — same formula as backend KpisRepository.
+ * 
+ * NOTE: This function cannot differentiate between carryover (tasks from previous sprints)
+ * and task delays (tasks delayed within the same sprint) because it doesn't have access
+ * to the original sprint ID of each task. For accurate carryover vs delay metrics, use
+ * the backend KPI endpoints (/api/projects/{pjId}/kpis/retrabajo) which properly
+ * separate the two using SQL EXISTS subqueries.
  */
 export function computeSprintKpis(tasks: SprintTaskJoined[]): ComputedKpis {
   const total = tasks.length;

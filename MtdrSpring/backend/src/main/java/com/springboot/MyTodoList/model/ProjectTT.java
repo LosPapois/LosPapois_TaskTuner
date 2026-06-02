@@ -78,7 +78,7 @@ public class ProjectTT {
     /*
      * When true, a daily scheduled job (@Scheduled) automatically marks sprints
      * as 'done' when their dateEndSpr is in the past.
-     * When false, the manager must press "Terminar Sprint" manually on the sprint page.
+     * When false, the manager must press "Finalize Sprint" manually on the sprint page.
      * Defaults to false — opt-in per project.
      */
     @Column(name = "AUTO_CLOSE_SPRINTS", columnDefinition = "NUMBER(1) DEFAULT 0")

@@ -42,6 +42,9 @@ public class TaskTT {
     @Column(name = "PJ_ID", nullable = false)
     private long pjId;
 
+    @Transient
+    private Boolean carriedOver;
+
     // ─── Constructors ────────────────────────────────────────────────────
 
     public TaskTT() {}
@@ -97,4 +100,7 @@ public class TaskTT {
 
     public long getPjId()                            { return pjId; }
     public void setPjId(long pjId)                   { this.pjId = pjId; }
+
+    public Boolean getCarriedOver()                  { return carriedOver; }
+    public void setCarriedOver(Boolean carriedOver)  { this.carriedOver = carriedOver; }
 }

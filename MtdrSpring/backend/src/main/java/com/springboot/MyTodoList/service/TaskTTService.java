@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.service;
 
 import com.springboot.MyTodoList.model.TaskTT;
 import com.springboot.MyTodoList.repository.ProjectUserTTRepository;
+import com.springboot.MyTodoList.repository.SprintTaskTTRepository;
 import com.springboot.MyTodoList.repository.TaskTTRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,13 @@ public class TaskTTService {
      */
     @Autowired
     private ProjectUserTTRepository projectUserTTRepository;
+
+    /*
+     * Repository for SPRINT_TASK_TT — used to check if a task appears in
+     * a previous sprint (for carriedOver flag population).
+     */
+    @Autowired
+    private SprintTaskTTRepository sprintTaskTTRepository;
 
     // ─── Read Operations ─────────────────────────────────────────────────
 
@@ -141,6 +149,23 @@ public class TaskTTService {
 
     public List<TaskTT> getTasksByFeatureInActiveSprint(long featureId) {
         return taskTTRepository.findByFeatureIdInActiveSprint(featureId);
+    }
+
+    /**
+     * Populates the carriedOver flag for a list of tasks based on sprint context.
+     * A task is "carried over" if it appears in a sprint with SPR_ID < sprId.
+     *
+     * @param tasks the task list to populate
+     * @param sprId the current sprint ID (used as reference for "previous" sprints)
+     * @return the same list with carriedOver flags set
+     */
+    public List<TaskTT> populateCarriedOverFlags(List<TaskTT> tasks, long sprId) {
+        for (TaskTT task : tasks) {
+            // Check if this task appears in any sprint with sprId < current sprId
+            long count = sprintTaskTTRepository.countByIdTaskIdAndIdSprIdLessThan(task.getTaskId(), sprId);
+            task.setCarriedOver(count > 0);
+        }
+        return tasks;
     }
 
     // ─── Write Operations ─────────────────────────────────────────────────
