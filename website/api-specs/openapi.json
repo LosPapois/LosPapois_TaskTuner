@@ -1,0 +1,16 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TaskTuner API",
+    "version": "1.0.0",
+    "description": "REST API de TaskTuner. Para la especificación completa y actualizada, descárgala desde el backend en ejecución: GET /v3/api-docs"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local"
+    }
+  ],
+  "paths": {},
+  "components": {}
+}

@@ -9,6 +9,7 @@ import com.springboot.MyTodoList.model.UserTT;
 import com.springboot.MyTodoList.util.BotActions;
 import com.springboot.MyTodoList.util.BotConversationState;
 import com.springboot.MyTodoList.util.BotMessages;
+import com.springboot.MyTodoList.util.BotTaskDraft;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,11 +26,13 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -333,6 +336,18 @@ class BotActionsTest {
     }
 
     @Test
+    @DisplayName("EDIT_FIELD:feature transitions to WAITING_EDIT_TASK_NEW_FEATURE")
+    void editField_feature_transitions_to_waiting_state() throws Exception {
+        authenticate(user);
+        actions("EDIT_PICK:55").fnEditPickTask();
+
+        clearInvocations(telegramClient);
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+
+        assertEquals(BotConversationState.WAITING_EDIT_TASK_NEW_FEATURE, conversationState());
+    }
+
+    @Test
     @DisplayName("fnAsk, fnAiCreate, fnAddFeature, fnImportTasks, fnLLM and fnElse start their chatbot flows")
     void chatbot_entrypoints_start_their_flows() throws Exception {
         authenticate(user);
@@ -366,12 +381,135 @@ class BotActionsTest {
     }
 
     @Test
+    @DisplayName("Edit task feature: shows sprint features as keyboard options")
+    void editTaskFeature_shows_feature_selection_keyboard() throws Exception {
+        authenticate(user);
+        actions("EDIT_PICK:55").fnEditPickTask();
+        clearInvocations(telegramClient);
+
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+
+        assertEquals(BotConversationState.WAITING_EDIT_TASK_NEW_FEATURE, conversationState());
+        boolean hasFeatureButton = sentMessages().stream().anyMatch(msg -> {
+            if (!(msg.getReplyMarkup() instanceof InlineKeyboardMarkup kb)) return false;
+            return kb.getKeyboard().stream().flatMap(List::stream)
+                    .anyMatch(btn -> btn.getCallbackData().equals("EDIT_TASK_FEAT:" + FEATURE_ID));
+        });
+        assertTrue(hasFeatureButton, "Feature selection must include EDIT_TASK_FEAT:{id} button");
+    }
+
+    @Test
+    @DisplayName("Edit task feature: EDIT_TASK_FEAT:none sets featureId to null")
+    void editTaskFeature_none_sets_featureId_null() throws Exception {
+        authenticate(user);
+        actions("EDIT_PICK:55").fnEditPickTask();
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+        clearInvocations(telegramClient);
+
+        actions("EDIT_TASK_FEAT:none").fnPendingConversation();
+
+        ArgumentCaptor<TaskTT> captor = ArgumentCaptor.forClass(TaskTT.class);
+        verify(taskTTService).updateTask(eq(TASK_ID), captor.capture());
+        assertNull(captor.getValue().getFeatureId());
+        assertNull(conversationState());
+    }
+
+    @Test
+    @DisplayName("Edit task feature: EDIT_TASK_FEAT:{id} updates featureId and confirms")
+    void editTaskFeature_id_updates_featureId() throws Exception {
+        authenticate(user);
+        actions("EDIT_PICK:55").fnEditPickTask();
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+        clearInvocations(telegramClient);
+
+        actions("EDIT_TASK_FEAT:" + FEATURE_ID).fnPendingConversation();
+
+        ArgumentCaptor<TaskTT> captor = ArgumentCaptor.forClass(TaskTT.class);
+        verify(taskTTService).updateTask(eq(TASK_ID), captor.capture());
+        assertEquals(FEATURE_ID, captor.getValue().getFeatureId());
+        assertNull(conversationState());
+        assertTrue(sentMessages().stream().anyMatch(msg -> msg.getText().contains("Feature updated")));
+    }
+
+    @Test
     @DisplayName("fnDone and fnDelete remain safe no-ops")
     void fnDone_and_fnDelete_are_safe_noops() throws Exception {
         BotActions doneActions = actions("/done");
         doneActions.fnDone();
         doneActions.fnDelete();
         verifyNoInteractions(telegramClient);
+    }
+
+    @Test
+    @DisplayName("Task creation: FEATURE:none sets featureId to null")
+    void taskCreation_featureNone_sets_null_featureId() throws Exception {
+        authenticate(user);
+
+        actions("/addtask").fnAddItem();
+        actions("Implement login").fnPendingConversation();
+        actions("Build a login page").fnPendingConversation();
+        actions("8").fnPendingConversation();
+        actions("PRIO:high").fnPendingConversation();
+        clearInvocations(telegramClient);
+        actions("SPRINT:1").fnPendingConversation();
+        assertEquals(BotConversationState.WAITING_NEW_ITEM_FEATURE, conversationState());
+
+        clearInvocations(telegramClient);
+        actions("FEATURE:none").fnPendingConversation();
+
+        ArgumentCaptor<TaskTT> captor = ArgumentCaptor.forClass(TaskTT.class);
+        verify(taskTTService).addTask(captor.capture());
+        assertNull(captor.getValue().getFeatureId());
+    }
+
+    @Test
+    @DisplayName("Task creation: feature selection keyboard includes 'Sin feature' button")
+    void taskCreation_featureSelection_includes_sinFeature_button() throws Exception {
+        authenticate(user);
+
+        actions("/addtask").fnAddItem();
+        actions("My task").fnPendingConversation();
+        actions("Desc").fnPendingConversation();
+        actions("3").fnPendingConversation();
+        actions("PRIO:medium").fnPendingConversation();
+        clearInvocations(telegramClient);
+        actions("SPRINT:1").fnPendingConversation();
+
+        boolean hasSinFeature = sentMessages().stream().anyMatch(msg -> {
+            if (!(msg.getReplyMarkup() instanceof InlineKeyboardMarkup kb)) return false;
+            return kb.getKeyboard().stream().flatMap(List::stream)
+                    .anyMatch(btn -> btn.getCallbackData().equals("FEATURE:none"));
+        });
+        assertTrue(hasSinFeature, "Feature selection keyboard must include FEATURE:none button");
+    }
+
+    @Test
+    @DisplayName("Edit task feature: task with no sprint shows error and clears state")
+    void editTaskFeature_noSprint_showsError() throws Exception {
+        authenticate(user);
+
+        // Given: a task with no sprint links
+        TaskTT task = new TaskTT();
+        task.setTaskId(99L);
+        task.setUserId(1L);
+        when(taskTTService.getTaskById(99L)).thenReturn(Optional.of(task));
+        when(sprintTaskTTService.getSprintsForTask(99L)).thenReturn(Collections.emptyList());
+
+        // Set up draft pointing to task 99 and state WAITING_EDIT_TASK_FIELD
+        BotTaskDraft draft = new BotTaskDraft();
+        draft.setTaskId(99L);
+        this.<Long, BotTaskDraft>staticMap("taskDrafts").put(CHAT_ID, draft);
+        this.<Long, BotConversationState>staticMap("chatStates").put(CHAT_ID, BotConversationState.WAITING_EDIT_TASK_FIELD);
+
+        // Trigger EDIT_FIELD:feature via fnPendingConversation (same pattern as other edit tests)
+        actions("EDIT_FIELD:feature").fnPendingConversation();
+
+        // Verify error message sent
+        assertTrue(sentMessages().stream().anyMatch(msg ->
+                msg.getChatId().equals(String.valueOf(CHAT_ID)) &&
+                msg.getText().contains("Could not find sprint")));
+        // State should not be WAITING_EDIT_TASK_NEW_FEATURE
+        assertNotEquals(BotConversationState.WAITING_EDIT_TASK_NEW_FEATURE, conversationState());
     }
 
     private BotActions actions(String requestText) {
