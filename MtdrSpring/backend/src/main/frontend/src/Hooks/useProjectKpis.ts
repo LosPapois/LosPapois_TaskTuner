@@ -14,9 +14,10 @@ interface VelocityMetric {
 
 interface SprintRework {
   sprint: string;
-  carried_points: number | null;
-  total_points: number | null;
-  rework_rate: number | null;
+  carried_points: number | null;    // Count of tasks carried over from previous sprint
+  total_points: number | null;      // Total task count in this sprint
+  carryover_rate: number | null;    // Percentage of tasks carried over (0–100)
+  delayed_points: number | null;    // Count of tasks completed after planned end date
 }
 
 interface SprintCompletion {
@@ -37,11 +38,14 @@ export interface ProjectKpis {
   hasError: boolean;
   /** Average pct_weighted across all sprints (0–100). null when no data. */
   avgProgress: number | null;
-  /** Average rework_rate across all sprints (0–100). null when no data. */
+  /** Average carryover rate across all sprints (0–100).
+   *  = average percentage of tasks carried over from previous sprints per sprint. */
   carryRate: number | null;
-  /** Highest rework_rate among the project's sprints (0–100). null when no data. */
+  /** Average task delay rate across all sprints (0–100). null when no data. */
+  delayRate: number | null;
+  /** Highest carryover_rate among the project's sprints (0–100). null when no data. */
   worstSprintRework: number | null;
-  /** Number of sprints whose rework_rate > 0 — i.e. sprints with delays. */
+  /** Number of sprints with delays. */
   delayedSprintsCount: number;
   /** Total number of sprints reported by the completitud endpoint. */
   sprintsCount: number;
@@ -56,6 +60,7 @@ const EMPTY: ProjectKpis = {
   hasError: false,
   avgProgress: null,
   carryRate: null,
+  delayRate: null,
   worstSprintRework: null,
   delayedSprintsCount: 0,
   sprintsCount: 0,
@@ -159,27 +164,43 @@ export default function useProjectKpis(projectId: number | undefined): ProjectKp
             completionWithData.length
           : null;
 
-      const reworkWithData = rework.filter(s => s.rework_rate != null);
+      const reworkWithData = rework.filter(s => s.carryover_rate != null);
+      
+      // Average carryover rate across all sprints
       const carryRate =
         reworkWithData.length > 0
-          ? reworkWithData.reduce((sum, s) => sum + (s.rework_rate ?? 0), 0) /
+          ? reworkWithData.reduce((sum, s) => sum + (s.carryover_rate ?? 0), 0) /
             reworkWithData.length
           : null;
 
+      // Highest carryover rate in any single sprint
       const worstSprintRework =
         reworkWithData.length > 0
-          ? Math.max(...reworkWithData.map(s => s.rework_rate ?? 0))
+          ? Math.max(...reworkWithData.map(s => s.carryover_rate ?? 0))
           : null;
 
+      // Number of sprints with any carryover
       const delayedSprintsCount = reworkWithData.filter(
-        s => (s.rework_rate ?? 0) > 0
+        s => (s.carryover_rate ?? 0) > 0
       ).length;
+
+      // Calculate delay rate: average percentage of tasks delayed across all sprints
+      const delayRate =
+        reworkWithData.length > 0
+          ? reworkWithData.reduce((sum, s) => {
+              const sprintDelayRate = s.total_points && s.total_points > 0
+                ? (s.delayed_points ?? 0) / s.total_points * 100
+                : 0;
+              return sum + sprintDelayRate;
+            }, 0) / reworkWithData.length
+          : null;
 
       const next: ProjectKpis = {
         loading: false,
         hasError,
         avgProgress,
         carryRate,
+        delayRate,
         worstSprintRework,
         delayedSprintsCount,
         sprintsCount: completion.length,

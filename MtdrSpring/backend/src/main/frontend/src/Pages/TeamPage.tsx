@@ -5,6 +5,7 @@ import {
   CalendarDaysIcon,
   ClockIcon,
   ExclamationCircleIcon,
+  ExclamationTriangleIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -844,11 +845,11 @@ export default function TeamPage() {
                 value={
                   projectKpis.loading
                     ? '…'
-                    : projectKpis.worstSprintRework != null
-                      ? `${projectKpis.worstSprintRework.toFixed(0)}%`
+                    : projectKpis.delayRate != null
+                      ? `${projectKpis.delayRate.toFixed(0)}%`
                       : '—'
                 }
-                icon={ExclamationCircleIcon}
+                icon={ExclamationTriangleIcon}
                 tone="danger"
               >
                 <p className="text-xs text-gray-500">
