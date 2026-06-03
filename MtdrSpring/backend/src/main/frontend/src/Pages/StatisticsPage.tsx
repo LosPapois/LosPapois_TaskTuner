@@ -296,25 +296,30 @@ export default function StatisticsPage() {
         const nowTime = new Date().getTime();
         let currentActiveSprint = null;
 
-        // Check if we are within the dates of any sprint (inclusive of end day)
-        const ongoingSprints = sortedSprints.filter(s => {
-          if (!s.dateStartSpr || !s.dateEndSpr) return false;
-          const start = new Date(s.dateStartSpr).getTime();
-          const end = new Date(s.dateEndSpr).getTime() + (24 * 60 * 60 * 1000);
-          return nowTime >= start && nowTime <= end;
-        });
+        // Prefer the sprint explicitly marked as active (most recent if multiple).
+        const activeSprintsList = sortedSprints.filter(
+          s => s.stateSprint?.toLowerCase() === 'active'
+        );
 
-        if (ongoingSprints.length > 0) {
-          currentActiveSprint = ongoingSprints[ongoingSprints.length - 1];
+        if (activeSprintsList.length > 0) {
+          currentActiveSprint = activeSprintsList[activeSprintsList.length - 1];
         } else {
-          // Fallback: most recent sprint that has started
-          const startedSprints = sortedSprints.filter(s => s.dateStartSpr && new Date(s.dateStartSpr).getTime() <= nowTime);
-          if (startedSprints.length > 0) {
-            currentActiveSprint = startedSprints[startedSprints.length - 1];
+          // Check if we are within the dates of any sprint (inclusive of end day)
+          const ongoingSprints = sortedSprints.filter(s => {
+            if (!s.dateStartSpr || !s.dateEndSpr) return false;
+            const start = new Date(s.dateStartSpr).getTime();
+            const end = new Date(s.dateEndSpr).getTime() + (24 * 60 * 60 * 1000);
+            return nowTime >= start && nowTime <= end;
+          });
+
+          if (ongoingSprints.length > 0) {
+            currentActiveSprint = ongoingSprints[ongoingSprints.length - 1];
           } else {
-            // Fallback: explicitly marked as active
-            const activeSprintsList = sortedSprints.filter(s => s.stateSprint?.toLowerCase() === 'active');
-            currentActiveSprint = activeSprintsList[activeSprintsList.length - 1] ?? null;
+            // Fallback: most recent sprint that has started
+            const startedSprints = sortedSprints.filter(
+              s => s.dateStartSpr && new Date(s.dateStartSpr).getTime() <= nowTime
+            );
+            currentActiveSprint = startedSprints[startedSprints.length - 1] ?? null;
           }
         }
 
@@ -323,15 +328,26 @@ export default function StatisticsPage() {
           setActiveSprintEndDate(currentActiveSprint.dateEndSpr ?? null);
 
           // Reuse already-fetched tasks for the active sprint pie chart
-          const activeSprintIndex = sortedSprints.findIndex(
+          const activeSprintIndex = visibleSprints.findIndex(
             sprint => sprint.sprId === currentActiveSprint.sprId
           );
-          const activeSprintTasks =
+          const activeSprintLinks =
             activeSprintIndex >= 0 ? sprintLinks[activeSprintIndex] ?? [] : [];
+          const activeSprintTasks = activeSprintLinks.filter(link => {
+            const task = tasksById.get(link.taskId);
+            return task != null;
+          });
 
-          const activeTasks = activeSprintTasks.filter(t => normalizeTaskState(t.stateTask) === 'active').length;
-          const delayedTasks = activeSprintTasks.filter(t => normalizeTaskState(t.stateTask) === 'delayed').length;
-          const doneTasks = activeSprintTasks.filter(t => normalizeTaskState(t.stateTask) === 'done').length;
+          const { activeTasks, delayedTasks, doneTasks } = activeSprintTasks.reduce(
+            (acc, task) => {
+              const state = (task.stateTask ?? '').toLowerCase();
+              if (state === 'active') acc.activeTasks += 1;
+              else if (state === 'delayed') acc.delayedTasks += 1;
+              else if (state === 'done') acc.doneTasks += 1;
+              return acc;
+            },
+            { activeTasks: 0, delayedTasks: 0, doneTasks: 0 }
+          );
 
           setSprintTasksByState({ active: activeTasks, delayed: delayedTasks, done: doneTasks });
         } else if (!cancelled) {

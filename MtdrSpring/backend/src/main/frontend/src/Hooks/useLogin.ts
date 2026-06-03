@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_CONFIG } from '../config';
-import { saveToStorage, STORAGE_KEYS } from '../Utils/storage';
+import { removeFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
 
 interface LoginCredentials {
   mail: string;
@@ -45,6 +45,9 @@ export default function useLogin(): UseLoginReturn {
         if (user.token) {
           saveToStorage(STORAGE_KEYS.AUTH_TOKEN, user.token);
         }
+
+        // Clear cached project list from previous sessions to avoid UI flicker.
+        removeFromStorage(STORAGE_KEYS.PROJECTS);
         
         navigate('/home');
       } else {

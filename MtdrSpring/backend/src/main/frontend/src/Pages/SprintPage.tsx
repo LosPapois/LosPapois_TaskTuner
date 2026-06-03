@@ -188,10 +188,6 @@ export default function SprintPage() {
   // Used in place of local weighted formula to ensure consistency with backend.
   const [sprintCarryoverRate, setSprintCarryoverRate] = useState<number | null>(null);
 
-  // Backend-calculated delayed points for this sprint (tasks completed after planned date).
-  // Used to populate the Task Delay KPI with accurate backend calculation.
-  const [sprintDelayedPoints, setSprintDelayedPoints] = useState<number | null>(null);
-
   // userId → display name lookup, for "developer" badge on each feature.
   // Built from /api/users-tt — small payload, fetched once on mount.
   const [usersById, setUsersById] = useState<Map<number, string>>(new Map());
@@ -281,20 +277,18 @@ export default function SprintPage() {
         /* Leave KPIs empty on failure — page falls back to ZERO_KPIS via memo. */
       });
 
-    // Fetch backend KPI data (retrabajo) to get authoritative carryover_rate and delayed_points for this sprint.
+    // Fetch backend KPI data (retrabajo) to get authoritative carryover_rate for this sprint.
     const kpisRequest = (sprintDto?.pjId ?? projectId)
       ? fetch(`/api/projects/${sprintDto?.pjId ?? projectId}/kpis/retrabajo`)
           .then(r => (r.ok ? r.json() : []))
-          .then((data: Array<{ sprint: string; carryover_rate: number; delayed_points: number; total_points: number }>) => {
+          .then((data: Array<{ sprint: string; carryover_rate: number }>) => {
             if (cancelled) return;
             // Find the metrics for the current sprint
             const sprintData = data.find(s => s.sprint === sprintDto?.nameSprint);
             setSprintCarryoverRate(sprintData?.carryover_rate ?? null);
-            setSprintDelayedPoints(sprintData?.delayed_points ?? null);
           })
           .catch(() => {
             setSprintCarryoverRate(null);
-            setSprintDelayedPoints(null);
           })
       : Promise.resolve();
 
@@ -375,10 +369,13 @@ export default function SprintPage() {
     && sprintId >= 0
     && (sprintDataLoading || usersLoading);
 
-  // KPIs are computed from tasks, but carryRate and taskDelay are replaced with backend values
-  // to ensure accuracy (backend uses actual task counts and completion dates).
+  // KPIs are computed from tasks, but carryRate is replaced with backend value
+  // to ensure accuracy (backend uses task count, not weighted points).
   const computedKpis = useMemo(() => {
     const kpis = computeSprintKpis(sprintTasks);
+    const delayedCount = sprintTasks.filter(
+      t => normalizeTaskState(t.stateTask) === 'delayed'
+    ).length;
     // Override carryRate with the backend-calculated value if available
     if (sprintCarryoverRate !== null) {
       kpis.carryRate = Math.round(sprintCarryoverRate);
@@ -386,13 +383,15 @@ export default function SprintPage() {
         (sprintCarryoverRate / 100) * sprintTasks.length
       );
     }
-    // Override taskDelay with the backend-calculated delayed_points if available
-    if (sprintDelayedPoints !== null && sprintTasks.length > 0) {
-      kpis.taskDelay = Math.round((sprintDelayedPoints / sprintTasks.length) * 100);
-      kpis.delayedTasks = sprintDelayedPoints;
+    if (sprintTasks.length > 0) {
+      kpis.taskDelay = Math.round((delayedCount / sprintTasks.length) * 100);
+      kpis.delayedTasks = delayedCount;
+    } else {
+      kpis.taskDelay = 0;
+      kpis.delayedTasks = 0;
     }
     return kpis;
-  }, [sprintTasks, sprintCarryoverRate, sprintDelayedPoints]);
+  }, [sprintTasks, sprintCarryoverRate]);
 
   // Enrich each backend Feature with stats computed from this sprint's tasks:
   // total/done counts, summed story points, the assigned developer (if all

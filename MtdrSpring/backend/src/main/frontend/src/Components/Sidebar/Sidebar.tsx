@@ -71,7 +71,9 @@ function Sidebar({ isOpen }: SidebarProps) {
   // the backend / proxy is offline.
   const [projects, setProjects] = useState<ProjectDTO[]>(() => {
     const cached = getFromStorage<ProjectDTO[]>(STORAGE_KEYS.PROJECTS);
-    return cached && cached.length > 0 ? cached : MOCK_PROJECTS;
+    if (cached && cached.length > 0) return cached;
+    const currentUser = getFromStorage<SessionUser>(STORAGE_KEYS.USER);
+    return currentUser?.userId ? [] : MOCK_PROJECTS;
   });
 
   useEffect(() => {
