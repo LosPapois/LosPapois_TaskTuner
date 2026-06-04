@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { ClipboardDocumentListIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { MemberListItem } from '../Team';
 
 // Max tasks shown per page in list mode before pagination kicks in.
@@ -274,7 +275,15 @@ export default function DeveloperTaskBoard({
           Developers ({developers.length})
         </h3>
         {developers.length === 0 ? (
-          <p className="text-sm text-gray-400">No developers with tasks in this sprint.</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <UsersIcon
+              className="h-10 w-10 text-gray-300 mb-2"
+              aria-hidden="true"
+            />
+            <p className="text-sm text-gray-500">
+              No developers with tasks in this sprint.
+            </p>
+          </div>
         ) : (
           <div className="space-y-2">
             {developers.map(d => (
@@ -378,13 +387,27 @@ export default function DeveloperTaskBoard({
                   Assigned Tasks ({tasks.length})
                 </h4>
                 {tasks.length === 0 ? (
-                  <p className="text-sm text-gray-400">No tasks assigned to this developer in this sprint.</p>
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <ClipboardDocumentListIcon
+                      className="h-12 w-12 text-gray-300 mb-3"
+                      aria-hidden="true"
+                    />
+                    <p className="text-sm text-gray-500">
+                      No tasks assigned to this developer in this sprint.
+                    </p>
+                  </div>
                 ) : filteredTasks.length === 0 ? (
-                  <p className="text-sm text-gray-400">
-                    {hasActiveFilters
-                      ? 'No tasks match the current filters.'
-                      : 'No tasks to show.'}
-                  </p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <ClipboardDocumentListIcon
+                      className="h-10 w-10 text-gray-300 mb-2"
+                      aria-hidden="true"
+                    />
+                    <p className="text-sm text-gray-500">
+                      {hasActiveFilters
+                        ? 'No tasks match the current filters.'
+                        : 'No tasks to show.'}
+                    </p>
+                  </div>
                 ) : (
                   <>
                     <ul className="space-y-2">

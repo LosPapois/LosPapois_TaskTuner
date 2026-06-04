@@ -214,7 +214,7 @@ export default function AddTaskModal({
         aria-modal="true"
         aria-labelledby="add-task-title"
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7 max-h-[90vh] overflow-y-auto"
+        className="modal-card w-full max-w-md p-7 max-h-[90vh] overflow-y-auto"
       >
         <h2 id="add-task-title" className="text-xl font-bold text-gray-900 mb-5">
           {isEditMode ? 'Edit Task' : 'Add New Task'}

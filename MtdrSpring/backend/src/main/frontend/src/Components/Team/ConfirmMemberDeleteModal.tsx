@@ -39,7 +39,7 @@ export default function ConfirmMemberDeleteModal({
         aria-modal="true"
         aria-labelledby="confirm-delete-member-title"
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7"
+        className="modal-card w-full max-w-md p-7"
       >
         <h2 id="confirm-delete-member-title" className="text-xl font-bold text-gray-900 mb-3">
           Remove Team Member

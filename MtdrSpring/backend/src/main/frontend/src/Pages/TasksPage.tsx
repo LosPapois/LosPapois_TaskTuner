@@ -2,7 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button, TableBody, CircularProgress } from '@mui/material';
 import Moment from 'react-moment';
-import { FunnelIcon, CheckCircleIcon, ArrowUturnLeftIcon, TrashIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowUturnLeftIcon,
+  CheckCircleIcon,
+  ClipboardDocumentListIcon,
+  FunnelIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid';
 import palette from '../theme';
 import { saveToStorage, getFromStorage, STORAGE_KEYS } from '../Utils/storage';
@@ -408,148 +414,117 @@ export default function TasksPage() {
   // tasks to one column doesn't push the page vertically.
   if (isBoardMode) {
     return (
-      <div style={{
-        // Fill the parent <main> (which already handles overflow:auto).
-        // height:100% lets the inner columns lock to a viewport-relative
-        // size and scroll on their own.
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '24px',
-        boxSizing: 'border-box',
-        background: '#f3f4f6',
-      }}>
-        {/* Page header — stays fixed above the column grid. */}
-        <div style={{ marginBottom: '20px' }}>
-          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-            Project Backlog
-          </h1>
-          <p style={{ color: '#6b7280', margin: '4px 0 0 0', fontSize: '14px' }}>
+      // Board shell — inherits the global page background (gray-100 + dot
+      // pattern) so the Kanban feels like another section of the dashboard
+      // rather than a standalone canvas. Padding matches the other pages.
+      <div className="app-page-bg h-full flex flex-col px-6 py-8">
+        {/* Header — same hierarchy as other pages: bold h1 + muted subtitle */}
+        <header className="max-w-7xl mx-auto w-full mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 m-0">Project Backlog</h1>
+          <p className="text-sm text-gray-500 mt-1">
             {boardLoading ? 'Loading…' : 'Tasks grouped by lifecycle state.'}
           </p>
-        </div>
+        </header>
 
-        {/* Column grid — flex:1 + minHeight:0 is the trick that lets */}
-        {/* children with overflow:auto actually scroll inside flexbox. */}
-        <div style={{
-          flex: 1,
-          minHeight: 0,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(280px, 1fr))',
-          gap: '16px',
-        }}>
+        {/* Column grid — flex-1 + min-h-0 lets the children's overflow-y */}
+        {/* actually scroll inside the flex parent. */}
+        <div className="max-w-7xl mx-auto w-full flex-1 min-h-0 grid grid-cols-1 md:grid-cols-3 gap-4">
           {BOARD_COLUMNS.map(({ key, label, accent }) => {
             const items = board[key];
             return (
-              <div key={key} style={{
-                display: 'flex',
-                flexDirection: 'column',
-                background: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '14px',
-                overflow: 'hidden',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-              }}>
-                {/* Column header — sticky inside its own column, accent bar */}
-                {/* on the left for quick visual grouping. */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  padding: '14px 16px',
-                  borderBottom: '1px solid #e5e7eb',
-                  background: '#f9fafb',
-                  borderLeft: `4px solid ${accent}`,
-                }}>
-                  <h2 style={{
-                    margin: 0,
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    color: '#374151',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                  }}>{label}</h2>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#ffffff',
-                    background: accent,
-                    borderRadius: '9999px',
-                    padding: '2px 10px',
-                    minWidth: '24px',
-                    textAlign: 'center',
-                  }}>{items.length}</span>
+              // Column (lane): slate-50 sits one tier above the page bg so
+              // the white task cards "float" against it via shadow.
+              <div
+                key={key}
+                className="flex flex-col bg-slate-50 rounded-2xl overflow-hidden"
+              >
+                {/* Column header — accent reduced to a small dot before the */}
+                {/* label (the only colour anchor for the lane). Counter pill */}
+                {/* is fully neutral so the header stays calm and on-palette. */}
+                <div className="flex items-center justify-between gap-2 px-5 pt-5 pb-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className="h-2 w-2 rounded-full flex-shrink-0"
+                      style={{ background: accent }}
+                      aria-hidden="true"
+                    />
+                    <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-gray-700 m-0 truncate">
+                      {label}
+                    </h2>
+                  </div>
+                  <span className="inline-flex items-center justify-center text-[11px] font-semibold text-gray-600 bg-white border border-gray-200 rounded-full px-2 py-0.5 min-w-[22px]">
+                    {items.length}
+                  </span>
                 </div>
+
+                {/* Subtle divider — clarifies the separation between header */}
+                {/* and the card list without adding visual weight. */}
+                <div className="mx-5 border-b border-gray-200/70" aria-hidden="true" />
 
                 {/* Scrollable card list — overflow lives here so each */}
                 {/* column scrolls independently of the page. */}
-                <div style={{
-                  flex: 1,
-                  minHeight: 0,
-                  overflowY: 'auto',
-                  padding: '12px',
-                }}>
+                <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-3 pb-3 space-y-2.5">
                   {items.length === 0 ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      minHeight: '120px',
-                      color: '#9ca3af',
-                      fontSize: '13px',
-                      fontStyle: 'italic',
-                    }}>
-                      No tasks
+                    <div className="flex flex-col items-center justify-center text-center h-full min-h-[140px] py-6">
+                      <ClipboardDocumentListIcon
+                        className="h-10 w-10 text-gray-300 mb-2"
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm text-gray-500">No tasks</p>
                     </div>
                   ) : (
-                    items.map(t => (
-                      <div key={t.taskId}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedTask({ task: t, column: key })}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            setSelectedTask({ task: t, column: key });
-                          }
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1px solid #e5e7eb',
-                          borderLeft: `3px solid ${accent}`,
-                          borderRadius: '10px',
-                          padding: '12px 14px',
-                          marginBottom: '10px',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                          transition: 'transform 0.12s ease, box-shadow 0.12s ease',
-                          cursor: 'pointer',
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.08)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
-                        }}
-                      >
-                        <div style={{
-                          fontWeight: 600,
-                          color: '#111827',
-                          fontSize: '14px',
-                          marginBottom: '8px',
-                          lineHeight: 1.35,
-                        }}>
-                          {t.nameTask}
+                    items.map(t => {
+                      // Inline coloured pills — same semantic palette as the
+                      // rest of the app (red=high, amber=medium, green=low)
+                      // but using the soft 100/700 Tailwind variants so they
+                      // sit nicely on the white card without saturating.
+                      const priorityStyles: Record<string, string> = {
+                        high:   'bg-red-100 text-red-700',
+                        medium: 'bg-amber-100 text-amber-700',
+                        low:    'bg-green-100 text-green-700',
+                      };
+                      const priorityClass = t.priority
+                        ? priorityStyles[t.priority] ?? 'bg-gray-100 text-gray-500'
+                        : '';
+
+                      return (
+                        <div
+                          key={t.taskId}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedTask({ task: t, column: key })}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setSelectedTask({ task: t, column: key });
+                            }
+                          }}
+                          className="bg-white rounded-xl px-3.5 py-3 cursor-pointer
+                                     shadow-[0_3px_10px_rgba(15,23,42,0.05),0_10px_28px_rgba(15,23,42,0.07)]
+                                     hover:-translate-y-0.5
+                                     hover:shadow-[0_5px_14px_rgba(15,23,42,0.07),0_18px_36px_rgba(15,23,42,0.09)]
+                                     transition-all duration-200"
+                        >
+                          <div className="text-sm font-semibold text-gray-900 leading-snug mb-2 break-words">
+                            {t.nameTask}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {t.priority && (
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${priorityClass}`}
+                              >
+                                {t.priority}
+                              </span>
+                            )}
+                            {t.storyPoints != null && (
+                              <span className="inline-flex items-center bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[11px] font-semibold">
+                                {t.storyPoints} SP
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <PriorityBadge priority={t.priority} />
-                          <StoryPointsBadge points={t.storyPoints} />
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -570,6 +545,18 @@ export default function TasksPage() {
           const assigneeName = assignee ? assignee.nameUser : `User #${task.userId}`;
           const fmtDate = (iso?: string | null) =>
             iso ? new Date(iso).toLocaleDateString() : '—';
+
+          // "Time to complete" — only meaningful when the task is closed
+          // (has a real end date). Computed as full days between start and
+          // real end, rounded up so a same-day completion reads as "1 day".
+          const durationLabel = ((): string => {
+            if (!task.dateStartTask || !task.dateEndRealTask) return '—';
+            const start = new Date(task.dateStartTask).getTime();
+            const end = new Date(task.dateEndRealTask).getTime();
+            if (Number.isNaN(start) || Number.isNaN(end) || end < start) return '—';
+            const days = Math.max(1, Math.ceil((end - start) / 86_400_000));
+            return `${days} ${days === 1 ? 'day' : 'days'}`;
+          })();
 
           return (
             <div
@@ -664,10 +651,27 @@ export default function TasksPage() {
                   flexDirection: 'column',
                   gap: '18px',
                 }}>
-                  {/* Badges row */}
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <PriorityBadge priority={task.priority} />
-                    <StoryPointsBadge points={task.storyPoints} />
+                  {/* Badges row — matches the coloured pills used on the */}
+                  {/* card in the column. Soft 100/700 Tailwind variants. */}
+                  <div className="flex flex-wrap gap-2">
+                    {task.priority && (() => {
+                      const styles: Record<string, string> = {
+                        high:   'bg-red-100 text-red-700',
+                        medium: 'bg-amber-100 text-amber-700',
+                        low:    'bg-green-100 text-green-700',
+                      };
+                      const cls = styles[task.priority] ?? 'bg-gray-100 text-gray-500';
+                      return (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${cls}`}>
+                          {task.priority}
+                        </span>
+                      );
+                    })()}
+                    {task.storyPoints != null && (
+                      <span className="inline-flex items-center bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">
+                        {task.storyPoints} SP
+                      </span>
+                    )}
                   </div>
 
                   {/* Description */}
@@ -717,6 +721,10 @@ export default function TasksPage() {
                     <div>
                       <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Completed</div>
                       <div style={{ fontSize: '14px', color: '#111827', marginTop: '2px' }}>{fmtDate(task.dateEndRealTask)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Duration</div>
+                      <div style={{ fontSize: '14px', color: '#111827', marginTop: '2px' }}>{durationLabel}</div>
                     </div>
                   </div>
                 </div>

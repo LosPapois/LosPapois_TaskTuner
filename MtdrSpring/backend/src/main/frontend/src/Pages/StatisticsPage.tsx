@@ -11,7 +11,6 @@ import {
 import PageLoading from '../Components/Common/PageLoading';
 import CloseProjectModal from '../Components/Common/CloseProjectModal';
 import { SprintProgressPieChart, ProjectProgressBox } from '../Components/Sprint';
-import CycleTimeScatterPlot from '../Components/Charts/CycleTimeScatterPlot';
 import { getFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
 
 import {
@@ -459,7 +458,7 @@ export default function StatisticsPage() {
 
   if (loading) {
     return (
-      <div className="bg-gray-50 min-h-full px-6 py-8">
+      <div className="app-page-bg min-h-full px-6 py-8">
         <div className="container-main">
           <PageLoading
             title="Loading project statistics..."
@@ -471,7 +470,7 @@ export default function StatisticsPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-full px-6 py-8">
+    <div className="app-page-bg min-h-full px-6 py-8">
       <div className="container-main space-y-8">
         <header>
           <h1 className="heading-h2">
@@ -749,7 +748,7 @@ export default function StatisticsPage() {
 
           {/* Right Column: Widgets */}
           <div className="flex flex-col gap-6 h-full">
-            <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col flex-1">
+            <section className="section-card-flex flex-1">
               <div className="mb-4">
                 <h3 className="text-sm font-bold text-gray-900">Sprint Task Distribution</h3>
                 {activeSprint && (
@@ -778,9 +777,6 @@ export default function StatisticsPage() {
             />
           </div>
         </div>
-
-
-        <CycleTimeScatterPlot projectId={projectId} />
       </div>
 
       <CloseProjectModal

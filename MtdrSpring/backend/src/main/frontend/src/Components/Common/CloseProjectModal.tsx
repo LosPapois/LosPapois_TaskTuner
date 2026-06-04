@@ -119,7 +119,7 @@ export default function CloseProjectModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+        className="modal-card w-full max-w-md overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

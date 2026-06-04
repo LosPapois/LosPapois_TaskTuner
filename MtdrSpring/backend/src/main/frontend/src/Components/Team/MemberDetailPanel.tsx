@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ChevronRightIcon,
+  ClipboardDocumentListIcon,
   PencilSquareIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
@@ -311,9 +312,15 @@ function MemberDetailPanel({
             Assigned Tasks ({tasks.length})
           </h4>
           {!hasAnyTasks ? (
-            <p className="text-sm text-gray-400">
-              This member has no tasks assigned in this project.
-            </p>
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <ClipboardDocumentListIcon
+                className="h-12 w-12 text-gray-300 mb-3"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-gray-500">
+                This member has no tasks assigned in this project.
+              </p>
+            </div>
           ) : (
             <>
               {/* Filters: search by name + priority dropdown + state dropdown */}
@@ -364,11 +371,17 @@ function MemberDetailPanel({
               </div>
 
               {taskCount === 0 ? (
-                <p className="text-sm text-gray-400">
-                  {hasActiveFilters
-                    ? 'No tasks match the current filters.'
-                    : 'No tasks to show.'}
-                </p>
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <ClipboardDocumentListIcon
+                    className="h-10 w-10 text-gray-300 mb-2"
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm text-gray-500">
+                    {hasActiveFilters
+                      ? 'No tasks match the current filters.'
+                      : 'No tasks to show.'}
+                  </p>
+                </div>
               ) : (
                 <ul className="space-y-2">
                   {paginatedTasks.map(t => (

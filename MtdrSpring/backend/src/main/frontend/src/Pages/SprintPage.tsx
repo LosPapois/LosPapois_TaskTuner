@@ -1,11 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowTrendingUpIcon,
   CalendarIcon,
   CheckCircleIcon,
-  ClockIcon,
-  ExclamationCircleIcon,
   InboxIcon,
   StopIcon,
 } from '@heroicons/react/24/outline';
@@ -692,6 +689,9 @@ export default function SprintPage() {
       priority: mapTaskPriority(taskDTO.priority),
       developerName: devName,
       state: displayTaskState(taskDTO.stateTask),
+      dateStartTask: taskDTO.dateStartTask,
+      dateEndSetTask: taskDTO.dateEndSetTask,
+      dateEndRealTask: taskDTO.dateEndRealTask,
     });
   };
 
@@ -923,7 +923,7 @@ export default function SprintPage() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full px-6 py-8">
+    <div className="app-page-bg min-h-full px-6 py-8">
       <TaskDetailModal
         isOpen={selectedTaskForModal !== null}
         onClose={() => setSelectedTaskForModal(null)}
@@ -1025,7 +1025,7 @@ export default function SprintPage() {
         {/* Terminar Sprint — confirm dialog */}
         {showEndConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
+            <div className="modal-card w-full max-w-sm p-8">
               <h2 className="heading-h4 before:hidden mb-3">Terminar Sprint</h2>
               <p className="mt-3 text-sm text-gray-500">
                 ¿Seguro que quieres cerrar <span className="font-semibold text-gray-700">{sprint.name}</span>?
@@ -1063,7 +1063,6 @@ export default function SprintPage() {
           <KpiCard
             label="Sprint Progress"
             value={`${sprint.kpis.progress}%`}
-            icon={ArrowTrendingUpIcon}
             tone="success"
           >
             <ProgressBar value={sprint.kpis.progress} />
@@ -1072,7 +1071,6 @@ export default function SprintPage() {
           <KpiCard
             label="Carryover Rate"
             value={`${sprint.kpis.carryRate}%`}
-            icon={ExclamationCircleIcon}
             tone="warning"
           >
             <p className="text-xs text-gray-500">
@@ -1083,7 +1081,6 @@ export default function SprintPage() {
           <KpiCard
             label="Task Delay"
             value={`${sprint.kpis.taskDelay}%`}
-            icon={ExclamationCircleIcon}
             tone="danger"
           >
             <p className="text-xs text-gray-500">
@@ -1094,7 +1091,6 @@ export default function SprintPage() {
           <KpiCard
             label="Cycle Time"
             value={sprint.kpis.cycleTime}
-            icon={ClockIcon}
             tone="info"
           >
             <Sparkline />

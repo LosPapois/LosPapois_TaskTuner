@@ -17,7 +17,7 @@ function SidebarToggle({ isOpen, onToggle }: SidebarToggleProps) {
       onClick={onToggle}
       aria-expanded={isOpen}
       aria-label={isOpen ? 'Hide sidebar' : 'Show sidebar'}
-      className="btn-icon-light text-gray-500 hover:text-brand-dark"
+      className="btn-icon-light text-white hover:text-white hover:bg-white/15"
     >
       <Bars3Icon className="size-6" aria-hidden="true" />
     </button>

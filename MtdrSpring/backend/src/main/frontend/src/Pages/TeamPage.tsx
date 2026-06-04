@@ -1,10 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  ArrowTrendingUpIcon,
-  CalendarDaysIcon,
-  ClockIcon,
-  ExclamationCircleIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -485,6 +481,9 @@ export default function TeamPage() {
       priority: mapTaskPriority(taskDTO.priority) as MemberTaskPriority,
       developerName: dev?.name ?? 'Unassigned',
       state: taskDTO.dateEndRealTask ? 'Closed' : 'Active',
+      dateStartTask: taskDTO.dateStartTask,
+      dateEndSetTask: taskDTO.dateEndSetTask,
+      dateEndRealTask: taskDTO.dateEndRealTask,
     });
   };
 
@@ -712,7 +711,7 @@ export default function TeamPage() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full px-6 py-8">
+    <div className="app-page-bg min-h-full px-6 py-8">
       <TaskDetailModal
         isOpen={selectedTaskForModal !== null}
         onClose={() => setSelectedTaskForModal(null)}
@@ -807,7 +806,6 @@ export default function TeamPage() {
                       ? `${projectKpis.avgProgress.toFixed(0)}%`
                       : '—'
                 }
-                icon={ArrowTrendingUpIcon}
                 tone="success"
               >
                 {projectKpis.avgProgress != null ? (
@@ -828,7 +826,6 @@ export default function TeamPage() {
                       ? `${projectKpis.carryRate.toFixed(0)}%`
                       : '—'
                 }
-                icon={ExclamationCircleIcon}
                 tone="warning"
               >
                 <p className="text-xs text-gray-500">
@@ -848,7 +845,6 @@ export default function TeamPage() {
                       ? `${projectKpis.worstSprintRework.toFixed(0)}%`
                       : '—'
                 }
-                icon={ExclamationCircleIcon}
                 tone="danger"
               >
                 <p className="text-xs text-gray-500">
@@ -867,7 +863,6 @@ export default function TeamPage() {
                     : `${avgCycleTimeDays.toFixed(1)} ${avgCycleTimeDays === 1 ? 'day' : 'days'
                     }`
                 }
-                icon={ClockIcon}
                 tone="info"
               >
                 {avgCycleTimeDays != null ? (
@@ -882,7 +877,6 @@ export default function TeamPage() {
               <KpiCard
                 label="Project Delay"
                 value={projectDelayInfo?.label ?? '—'}
-                icon={CalendarDaysIcon}
                 tone={projectDelayInfo?.tone ?? 'info'}
               >
                 <p className="text-xs text-gray-500">

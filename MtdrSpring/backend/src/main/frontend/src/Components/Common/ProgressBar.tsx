@@ -2,7 +2,9 @@ import React from 'react';
 
 /** Linear progress bar used by KPI cards to show completion percentage. */
 export default function ProgressBar({ value }: { value: number }) {
-  const safe = Math.max(0, Math.min(value, 100));
+  // Clamp to [0, 100] and round so callers can pass raw floats (e.g. 20.00001)
+  // without leaking the decimals into the displayed label.
+  const safe = Math.max(0, Math.min(Math.round(value), 100));
 
   return (
     <div className="space-y-1.5">

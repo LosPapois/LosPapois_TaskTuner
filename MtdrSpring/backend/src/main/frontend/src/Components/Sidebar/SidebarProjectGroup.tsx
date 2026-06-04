@@ -90,7 +90,7 @@ function ProjectSettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+      <div className="modal-card w-full max-w-md p-8">
         <h2 className="text-2xl font-bold text-gray-900">Project Settings</h2>
 
         <div className="mt-6 space-y-5">
