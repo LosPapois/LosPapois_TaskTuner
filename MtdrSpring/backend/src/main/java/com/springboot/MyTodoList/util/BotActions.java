@@ -25,6 +25,7 @@ import com.springboot.MyTodoList.model.FeatureTT;
 import com.springboot.MyTodoList.model.ProjectTT;
 import com.springboot.MyTodoList.model.ProjectUserTT;
 import com.springboot.MyTodoList.model.SprintState;
+import com.springboot.MyTodoList.model.SprintTaskTT;
 import com.springboot.MyTodoList.model.SprintTT;
 import com.springboot.MyTodoList.model.TaskState;
 import com.springboot.MyTodoList.model.TaskTT;
@@ -555,6 +556,9 @@ public class BotActions {
             case WAITING_EDIT_TASK_NEW_SPRINT:
                 handleEditTaskNewSprint();
                 break;
+            case WAITING_EDIT_TASK_NEW_FEATURE:
+                handleEditTaskNewFeature();
+                break;
             case WAITING_EDIT_FEATURE_FIELD:
                 handleEditFeatureField();
                 break;
@@ -947,32 +951,33 @@ public class BotActions {
         exit = true;
     }
 
-    private void showFeatureSelectionForSprint(long sprintId) {
+    private void showFeatureSelectionKeyboard(long sprintId, String callbackPrefix, String prompt) {
         List<FeatureTT> features = featureTTService.getFeaturesBySprint(sprintId);
-
-        if (features.isEmpty()) {
-            taskDrafts.remove(chatId);
-            clearConversationState();
-            BotHelper.sendMessageToTelegram(chatId,
-                    "⚠️ This sprint has no features. Create a feature first before adding a task.",
-                    telegramClient, null);
-            showMainMenu();
-            return;
-        }
-
         var builder = InlineKeyboardMarkup.builder();
         for (FeatureTT f : features) {
             builder.keyboardRow(new InlineKeyboardRow(
                     InlineKeyboardButton.builder()
                             .text("🗂 " + f.getNameFeature())
-                            .callbackData("FEATURE:" + f.getFeatureId())
+                            .callbackData(callbackPrefix + f.getFeatureId())
                             .build()));
         }
         builder.keyboardRow(new InlineKeyboardRow(
+                InlineKeyboardButton.builder()
+                        .text("❌ Sin feature")
+                        .callbackData(callbackPrefix + "none")
+                        .build()));
+        builder.keyboardRow(new InlineKeyboardRow(
                 InlineKeyboardButton.builder().text("❌ Cancel").callbackData("CANCEL").build()));
-
         BotHelper.sendMessageToTelegramButtons(
-                chatId, BotMessages.SELECT_FEATURE.getMessage(), telegramClient, builder.build());
+                chatId, prompt, telegramClient, builder.build());
+    }
+
+    private void showFeatureSelectionForSprint(long sprintId) {
+        showFeatureSelectionKeyboard(sprintId, "FEATURE:", BotMessages.SELECT_FEATURE.getMessage());
+    }
+
+    private void showFeatureSelectionForTaskEdit(long sprintId) {
+        showFeatureSelectionKeyboard(sprintId, "EDIT_TASK_FEAT:", "🗂 Select the feature for this task:");
     }
 
     private void handleNewItemFeature() {
@@ -994,12 +999,16 @@ public class BotActions {
         }
 
         String featureToken = requestText.substring(8);
-        try {
-            draft.setFeatureId(Long.parseLong(featureToken));
-        } catch (NumberFormatException e) {
-            showFeatureSelectionForSprint(draft.getSprintId());
-            exit = true;
-            return;
+        if ("none".equals(featureToken)) {
+            draft.setFeatureId(null);
+        } else {
+            try {
+                draft.setFeatureId(Long.parseLong(featureToken));
+            } catch (NumberFormatException e) {
+                showFeatureSelectionForSprint(draft.getSprintId());
+                exit = true;
+                return;
+            }
         }
 
         saveTaskFromDraft(draft);
@@ -1448,6 +1457,28 @@ public class BotActions {
                 setCurrentState(BotConversationState.WAITING_EDIT_TASK_NEW_SPRINT);
                 showSprintSelection();
                 break;
+            case "feature":
+                BotTaskDraft fDraft = taskDrafts.get(chatId);
+                if (fDraft == null || fDraft.getTaskId() == null) {
+                    clearConversationState();
+                    BotHelper.sendMessageToTelegram(chatId, "Error. Please try again.", telegramClient, null);
+                    exit = true;
+                    return;
+                }
+                List<SprintTaskTT> links =
+                        sprintTaskTTService.getSprintsForTask(fDraft.getTaskId());
+                long sprId = links.isEmpty() ? 0L : links.get(0).getSprId();
+                if (sprId == 0L) {
+                    BotHelper.sendMessageToTelegram(chatId,
+                            "⚠️ Could not find sprint for this task.", telegramClient, null);
+                    clearConversationState();
+                    showMainMenu();
+                    exit = true;
+                    return;
+                }
+                setCurrentState(BotConversationState.WAITING_EDIT_TASK_NEW_FEATURE);
+                showFeatureSelectionForTaskEdit(sprId);
+                break;
             default:
                 BotHelper.sendMessageToTelegram(chatId, "Invalid option.", telegramClient, null);
         }
@@ -1465,6 +1496,8 @@ public class BotActions {
                         InlineKeyboardButton.builder().text("🎯 Priority").callbackData("EDIT_FIELD:priority").build()))
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder().text("🔄 Sprint").callbackData("EDIT_FIELD:sprint").build()))
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder().text("🗂 Feature").callbackData("EDIT_FIELD:feature").build()))
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder().text("❌ Cancel").callbackData("CANCEL").build()))
                 .build();
@@ -1628,7 +1661,7 @@ public class BotActions {
             return;
         }
 
-        List<com.springboot.MyTodoList.model.SprintTaskTT> currentSprints = sprintTaskTTService
+        List<SprintTaskTT> currentSprints = sprintTaskTTService
                 .getSprintsForTask(task.getTaskId());
 
         try {
@@ -1648,6 +1681,65 @@ public class BotActions {
         clearConversationState();
         BotHelper.sendMessageToTelegram(
                 chatId, "🔄 Task moved to *" + newSprint.getNameSprint() + "* successfully!", telegramClient, null);
+        showMainMenu();
+        exit = true;
+    }
+
+    private void handleEditTaskNewFeature() {
+        if (!requestText.startsWith("EDIT_TASK_FEAT:")) {
+            BotTaskDraft draft = taskDrafts.get(chatId);
+            if (draft != null && draft.getTaskId() != null) {
+                List<SprintTaskTT> links =
+                        sprintTaskTTService.getSprintsForTask(draft.getTaskId());
+                long sprId = links.isEmpty() ? 0L : links.get(0).getSprId();
+                if (sprId == 0L) {
+                    clearConversationState();
+                    BotHelper.sendMessageToTelegram(chatId,
+                            "⚠️ Could not find sprint for this task.", telegramClient, null);
+                    showMainMenu();
+                } else {
+                    showFeatureSelectionForTaskEdit(sprId);
+                }
+            }
+            exit = true;
+            return;
+        }
+
+        BotTaskDraft draft = taskDrafts.get(chatId);
+        if (draft == null || draft.getTaskId() == null) {
+            clearConversationState();
+            BotHelper.sendMessageToTelegram(chatId, "Error. Please try again with /edittask.", telegramClient, null);
+            exit = true;
+            return;
+        }
+
+        TaskTT task = taskTTService.getTaskById(draft.getTaskId()).orElse(null);
+        if (task == null) {
+            clearConversationState();
+            BotHelper.sendMessageToTelegram(chatId, "Task not found.", telegramClient, null);
+            exit = true;
+            return;
+        }
+
+        String featureToken = requestText.substring(15);
+        if ("none".equals(featureToken)) {
+            task.setFeatureId(null);
+        } else {
+            try {
+                task.setFeatureId(Long.parseLong(featureToken));
+            } catch (NumberFormatException e) {
+                List<SprintTaskTT> links =
+                        sprintTaskTTService.getSprintsForTask(draft.getTaskId());
+                long sprId = links.isEmpty() ? 0L : links.get(0).getSprId();
+                showFeatureSelectionForTaskEdit(sprId);
+                exit = true;
+                return;
+            }
+        }
+
+        taskTTService.updateTask(task.getTaskId(), task);
+        clearConversationState();
+        BotHelper.sendMessageToTelegram(chatId, "✅ Feature updated!", telegramClient, null);
         showMainMenu();
         exit = true;
     }
