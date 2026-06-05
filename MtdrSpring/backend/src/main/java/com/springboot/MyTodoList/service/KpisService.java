@@ -99,10 +99,11 @@ public class KpisService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Object[] row : rows) {
             Map<String, Object> map = new LinkedHashMap<>();
-            map.put("sprint",         row[0]);
-            map.put("carried_points", row[1]);
-            map.put("total_points",   row[2]);
-            map.put("rework_rate",    row[3]);
+            map.put("sprint",          row[0]);
+            map.put("carried_points",  row[1]);      // Tasks in current sprint that appeared in previous sprint
+            map.put("total_points",    row[2]);
+            map.put("carryover_rate",  row[3]);      // Percentage of tasks carried over from previous sprint
+            map.put("delayed_points",  row[4]);      // Tasks completed after their planned end date
             result.add(map);
         }
         return result;

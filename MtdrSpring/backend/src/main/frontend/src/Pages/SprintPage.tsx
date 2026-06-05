@@ -181,6 +181,10 @@ export default function SprintPage() {
   // /api/sprints/{sprId}/features which reads FEATURE_TT.
   const [rawFeatures, setRawFeatures] = useState<FeatureDTO[]>([]);
 
+  // Backend-calculated carryover rate for this sprint (from KPI retrabajo endpoint).
+  // Used in place of local weighted formula to ensure consistency with backend.
+  const [sprintCarryoverRate, setSprintCarryoverRate] = useState<number | null>(null);
+
   // userId → display name lookup, for "developer" badge on each feature.
   // Built from /api/users-tt — small payload, fetched once on mount.
   const [usersById, setUsersById] = useState<Map<number, string>>(new Map());
@@ -212,7 +216,7 @@ export default function SprintPage() {
   const [featureToDelete, setFeatureToDelete] = useState<FeatureDTO | null>(null);
 
   // autoCloseSprints setting for the current project — if false, show manual
-  // "Terminar Sprint" button on active sprints.
+  // "Finalize Sprint" button on active sprints.
   const [autoCloseSprints, setAutoCloseSprints] = useState<boolean>(true); // optimistic default hides button until fetched
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [endingsprint, setEndingSprint] = useState(false);
@@ -270,17 +274,32 @@ export default function SprintPage() {
         /* Leave KPIs empty on failure — page falls back to ZERO_KPIS via memo. */
       });
 
-    Promise.allSettled([sprintRequest, featuresRequest, tasksRequest]).finally(() => {
+    // Fetch backend KPI data (retrabajo) to get authoritative carryover_rate for this sprint.
+    const kpisRequest = (sprintDto?.pjId ?? projectId)
+      ? fetch(`/api/projects/${sprintDto?.pjId ?? projectId}/kpis/retrabajo`)
+          .then(r => (r.ok ? r.json() : []))
+          .then((data: Array<{ sprint: string; carryover_rate: number }>) => {
+            if (cancelled) return;
+            // Find the metrics for the current sprint
+            const sprintData = data.find(s => s.sprint === sprintDto?.nameSprint);
+            setSprintCarryoverRate(sprintData?.carryover_rate ?? null);
+          })
+          .catch(() => {
+            setSprintCarryoverRate(null);
+          })
+      : Promise.resolve();
+
+    Promise.allSettled([sprintRequest, featuresRequest, tasksRequest, kpisRequest]).finally(() => {
       if (!cancelled) setSprintDataLoading(false);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [sprintId, taskRefreshToken]);
+  }, [sprintId, taskRefreshToken, projectId, sprintDto?.nameSprint, sprintDto?.pjId]);
 
   // Fetch project autoCloseSprints so we know whether to show the manual
-  // "Terminar Sprint" button. Runs whenever the sprint's pjId is known.
+  // "Finalize Sprint" button. Runs whenever the sprint's pjId is known.
   useEffect(() => {
     const pid = sprintDto?.pjId ?? projectId;
     if (pid == null || pid < 0) return;
@@ -295,14 +314,14 @@ export default function SprintPage() {
     return () => { cancelled = true; };
   }, [sprintDto?.pjId, projectId]);
 
-  // Handler for the "Terminar Sprint" button
+  // Handler for the "Finalize Sprint" button
   const handleEndSprint = useCallback(async () => {
     if (!sprintId) return;
     setEndingSprint(true);
     try {
       const res = await fetch(`/api/sprints/${sprintId}/end`, { method: 'PATCH' });
       if (!res.ok && res.status !== 204) {
-        toast('Failed to end sprint', 'error');
+        toast('Failed to finalize sprint', 'error');
         return;
       }
       // If a next sprint was activated, navigate there; otherwise go to project
@@ -315,7 +334,7 @@ export default function SprintPage() {
         navigate(`/projects/${projectId}`);
       }
     } catch {
-      toast('Failed to end sprint', 'error');
+      toast('Failed to finalize sprint', 'error');
     } finally {
       setEndingSprint(false);
       setShowEndConfirm(false);
@@ -347,11 +366,29 @@ export default function SprintPage() {
     && sprintId >= 0
     && (sprintDataLoading || usersLoading);
 
-  // KPIs are pure derivation — no extra state needed.
-  const computedKpis = useMemo(
-    () => computeSprintKpis(sprintTasks),
-    [sprintTasks]
-  );
+  // KPIs are computed from tasks, but carryRate is replaced with backend value
+  // to ensure accuracy (backend uses task count, not weighted points).
+  const computedKpis = useMemo(() => {
+    const kpis = computeSprintKpis(sprintTasks);
+    const delayedCount = sprintTasks.filter(
+      t => normalizeTaskState(t.stateTask) === 'delayed'
+    ).length;
+    // Override carryRate with the backend-calculated value if available
+    if (sprintCarryoverRate !== null) {
+      kpis.carryRate = Math.round(sprintCarryoverRate);
+      kpis.carriedFeatures = Math.round(
+        (sprintCarryoverRate / 100) * sprintTasks.length
+      );
+    }
+    if (sprintTasks.length > 0) {
+      kpis.taskDelay = Math.round((delayedCount / sprintTasks.length) * 100);
+      kpis.delayedTasks = delayedCount;
+    } else {
+      kpis.taskDelay = 0;
+      kpis.delayedTasks = 0;
+    }
+    return kpis;
+  }, [sprintTasks, sprintCarryoverRate]);
 
   // Enrich each backend Feature with stats computed from this sprint's tasks:
   // total/done counts, summed story points, the assigned developer (if all
@@ -1005,7 +1042,7 @@ export default function SprintPage() {
             </div>
           </div>
 
-          {/* "Terminar Sprint" — visible only when sprint is active, has started, and autoCloseSprints=false */}
+          {/* "Finalize Sprint" — visible only when sprint is active, has started, and autoCloseSprints=false */}
           {sprintDto?.stateSprint === 'active'
             && !autoCloseSprints
             && sprintDto.dateStartSpr != null
@@ -1017,19 +1054,19 @@ export default function SprintPage() {
               className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors"
             >
               <StopIcon className="h-4 w-4" />
-              Terminar Sprint
+              Finalize Sprint
             </button>
           )}
         </header>
 
-        {/* Terminar Sprint — confirm dialog */}
+        {/* Finalize Sprint — confirm dialog */}
         {showEndConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="modal-card w-full max-w-sm p-8">
-              <h2 className="heading-h4 before:hidden mb-3">Terminar Sprint</h2>
+              <h2 className="heading-h4 before:hidden mb-3">Finalize Sprint</h2>
               <p className="mt-3 text-sm text-gray-500">
-                ¿Seguro que quieres cerrar <span className="font-semibold text-gray-700">{sprint.name}</span>?
-                El siguiente sprint más próximo se activará automáticamente.
+                Are you sure you want to finalize <span className="font-semibold text-gray-700">{sprint.name}</span>?
+                The next sprint will be activated automatically.
               </p>
               <div className="mt-6 flex gap-3">
                 <button
@@ -1037,14 +1074,14 @@ export default function SprintPage() {
                   disabled={endingsprint}
                   className="flex-1 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
-                  Cancelar
+                  Cancel
                 </button>
                 <button
                   onClick={handleEndSprint}
                   disabled={endingsprint}
                   className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                 >
-                  {endingsprint ? 'Cerrando…' : 'Sí, terminar'}
+                  {endingsprint ? 'Finalizing…' : 'Yes, finalize'}
                 </button>
               </div>
             </div>
@@ -1074,7 +1111,7 @@ export default function SprintPage() {
             tone="warning"
           >
             <p className="text-xs text-gray-500">
-              {sprint.kpis.carriedFeatures} of {sprint.kpis.totalFeatures} carried over tasks
+              {sprint.kpis.carriedFeatures} {sprint.kpis.carriedFeatures === 1 ? 'task' : 'tasks'} carried over out of {sprint.kpis.totalFeatures} tasks
             </p>
           </KpiCard>
 
@@ -1084,7 +1121,7 @@ export default function SprintPage() {
             tone="danger"
           >
             <p className="text-xs text-gray-500">
-              {sprint.kpis.delayedTasks} delayed tasks
+              {sprint.kpis.delayedTasks} delayed {sprint.kpis.delayedTasks === 1 ? 'task' : 'tasks'}
             </p>
           </KpiCard>
 

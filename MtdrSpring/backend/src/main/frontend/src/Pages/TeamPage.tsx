@@ -841,8 +841,8 @@ export default function TeamPage() {
                 value={
                   projectKpis.loading
                     ? '…'
-                    : projectKpis.worstSprintRework != null
-                      ? `${projectKpis.worstSprintRework.toFixed(0)}%`
+                    : projectKpis.delayRate != null
+                      ? `${projectKpis.delayRate.toFixed(0)}%`
                       : '—'
                 }
                 tone="danger"

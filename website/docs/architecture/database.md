@@ -12,60 +12,97 @@ title: Base de Datos
 
 ## Diagrama de Tablas
 
-```
-PROJECT_TT ──────────────────────────────────────────────────┐
-  pj_id (PK)                                                 │
-  name_pj, date_start_pj, date_end_set_pj                   │
-  date_end_real_pj, auto_rollover, auto_close_sprint         │
-       │                                                      │
-       ├──── SPRINT_TT                                        │
-       │       spr_id (PK)                                    │
-       │       name_sprint, date_start_spr, date_end_spr     │
-       │       task_goal, state_sprint (active/done)          │
-       │       pj_id (FK)                                     │
-       │           │                                          │
-       │           ├──── FEATURE_TT                           │
-       │           │       feature_id (PK)                    │
-       │           │       name_feature, description          │
-       │           │       priority_feature, spr_id (FK)      │
-       │           │           │                              │
-       │           │           └──── TASK_TT                  │
-       │           │                   task_id (PK)           │
-       │           │                   name_task, info_task   │
-       │           │                   story_points, priority │
-       │           │                   date_start/end_task    │
-       │           │                   user_id (FK)           │
-       │           │                   feature_id (FK)        │
-       │           │                   pj_id (FK)             │
-       │           │                       │
-       │           └──── SPRINT_TASK_TT    │
-       │                   spr_id (PK,FK)  │
-       │                   task_id (PK,FK)─┘
-       │                   state_task (active/done/delayed)
-       │
-       ├──── PROJECT_USER_TT
-       │       pj_id (PK,FK)
-       │       user_id (PK,FK)
-       │
-       ├──── DOCUMENT_TT
-       │       doc_id (PK)
-       │       name_pj_doc, url_obj_store
-       │       date_upload, embed_status (loading/loaded)
-       │       pj_id (FK)
-       │           │
-       │           └──── DOCUMENT_CHUNK_TT
-       │                   chunk_id (PK)
-       │                   doc_id (FK), pj_id
-       │                   chunk_index, chunk_text (CLOB)
-       │                   doc_name
-       │
-USER_TT
-  user_id (PK)
-  name_user, mail, password
-  id_telegram, role (manager/developer)
+```mermaid
+erDiagram
+    PROJECT_TT {
+        number pj_id PK
+        string name_pj
+        date date_start_pj
+        date date_end_set_pj
+        date date_end_real_pj
+        boolean auto_rollover
+        boolean auto_close_sprint
+    }
+    SPRINT_TT {
+        number spr_id PK
+        string name_sprint
+        date date_start_spr
+        date date_end_spr
+        number task_goal
+        string state_sprint
+        number pj_id FK
+    }
+    FEATURE_TT {
+        number feature_id PK
+        string name_feature
+        string description
+        string priority_feature
+        number spr_id FK
+    }
+    TASK_TT {
+        number task_id PK
+        string name_task
+        string info_task
+        number story_points
+        string priority
+        date date_start_task
+        date date_end_task
+        number user_id FK
+        number feature_id FK
+        number pj_id FK
+    }
+    SPRINT_TASK_TT {
+        number spr_id PK_FK
+        number task_id PK_FK
+        string state_task
+    }
+    USER_TT {
+        number user_id PK
+        string name_user
+        string mail
+        string password
+        string id_telegram
+        string role
+    }
+    PROJECT_USER_TT {
+        number pj_id PK_FK
+        number user_id PK_FK
+    }
+    DOCUMENT_TT {
+        number doc_id PK
+        string name_pj_doc
+        string url_obj_store
+        date date_upload
+        string embed_status
+        number pj_id FK
+    }
+    DOCUMENT_CHUNK_TT {
+        number chunk_id PK
+        number doc_id FK
+        number pj_id
+        number chunk_index
+        clob chunk_text
+        string doc_name
+    }
+    RAG_CHUNKS {
+        number chunk_id PK
+        number doc_id FK
+        number pj_id
+        clob content
+        vector embedding
+    }
 
-TODO_ITEM (legacy)
-SUBTASK_TT
+    PROJECT_TT ||--o{ SPRINT_TT : "tiene"
+    PROJECT_TT ||--o{ PROJECT_USER_TT : "tiene"
+    PROJECT_TT ||--o{ DOCUMENT_TT : "tiene"
+    SPRINT_TT ||--o{ FEATURE_TT : "tiene"
+    SPRINT_TT ||--o{ SPRINT_TASK_TT : "tiene"
+    FEATURE_TT ||--o{ TASK_TT : "agrupa"
+    TASK_TT ||--o{ SPRINT_TASK_TT : "pertenece"
+    USER_TT ||--o{ TASK_TT : "asignado"
+    USER_TT ||--o{ PROJECT_USER_TT : "miembro"
+    DOCUMENT_TT ||--o{ DOCUMENT_CHUNK_TT : "chunks"
+    DOCUMENT_TT ||--o{ RAG_CHUNKS : "embeddings"
 ```
 
 ## Tablas Principales

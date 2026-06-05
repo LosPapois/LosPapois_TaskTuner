@@ -2,9 +2,8 @@ import React from 'react';
 
 /** Linear progress bar used by KPI cards to show completion percentage. */
 export default function ProgressBar({ value }: { value: number }) {
-  // Clamp to [0, 100] and round so callers can pass raw floats (e.g. 20.00001)
-  // without leaking the decimals into the displayed label.
-  const safe = Math.max(0, Math.min(Math.round(value), 100));
+  const safe = Math.max(0, Math.min(value, 100));
+  const rounded = Math.round(safe);
 
   return (
     <div className="space-y-1.5">
@@ -20,7 +19,7 @@ export default function ProgressBar({ value }: { value: number }) {
           style={{ width: `${safe}%` }}
         />
       </div>
-      <div className="text-[11px] text-green-700 font-medium">Progress tracked at {safe}%</div>
+      <div className="text-[11px] text-green-700 font-medium">Progress tracked at {rounded}%</div>
     </div>
   );
 }
