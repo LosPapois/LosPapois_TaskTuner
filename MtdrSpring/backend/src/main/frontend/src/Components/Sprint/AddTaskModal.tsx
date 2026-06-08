@@ -8,7 +8,12 @@ export interface NewTaskData {
   priority: NewTaskPriority;
   /** Required — the modal validates this is filled before submitting. */
   storyPoints: number;
-  userId: number;
+  /**
+   * Optional assignee. `null` (or undefined) means the task is created in
+   * the sprint without anyone assigned yet — useful for planning when the
+   * team drops stories into the sprint first and decides ownership later.
+   */
+  userId: number | null;
   /** Optional feature to group this task under. */
   featureId?: number | null;
 }
@@ -169,9 +174,9 @@ export default function AddTaskModal({
     if (submitting) return;
 
     if (!form.nameTask.trim()) return setError('Task name is required.');
-    if (form.userId === '' || form.userId == null) {
-      return setError('Pick an assignee.');
-    }
+    // Assignee is now OPTIONAL — empty string from the dropdown means the
+    // task is created unassigned and stays in the sprint. We translate '' to
+    // null on submit instead of failing validation here.
 
     // Story points are required.
     if (form.storyPoints === '') {
@@ -190,7 +195,10 @@ export default function AddTaskModal({
         infoTask: form.infoTask.trim() || undefined,
         priority: form.priority,
         storyPoints,
-        userId: Number(form.userId),
+        // null = "(Unassigned)" sentinel from the dropdown → leaves USER_ID
+        // unset in the DB; the task still belongs to the sprint, just
+        // without an owner.
+        userId: form.userId === '' ? null : Number(form.userId),
         // null = "no feature" (sentinel empty string) → unset the FK.
         featureId: form.featureId === '' ? null : Number(form.featureId),
       });
@@ -299,7 +307,7 @@ export default function AddTaskModal({
 
           <div>
             <label htmlFor="task-assignee" className="block text-sm font-semibold text-gray-800 mb-2">
-              Assignee
+              Assignee <span className="text-gray-400 font-normal">(optional)</span>
             </label>
             <select
               id="task-assignee"
@@ -308,22 +316,28 @@ export default function AddTaskModal({
                 ...p,
                 userId: e.target.value === '' ? '' : Number(e.target.value),
               }))}
-              disabled={submitting || membersLoading || assigneeOptions.length === 0}
+              disabled={submitting || membersLoading}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm bg-white
                          focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand
                          transition-colors disabled:opacity-60"
             >
-              <option value="" disabled>
+              {/* "" is a legitimate value now — it means "create unassigned".
+                  The label shifts based on loading / empty states so it stays
+                  helpful in every case. */}
+              <option value="">
                 {membersLoading
                   ? 'Loading members…'
-                  : assigneeOptions.length === 0
-                    ? 'No project members — add some from Team first'
-                    : 'Select a member…'}
+                  : '(Unassigned — assign later)'}
               </option>
               {assigneeOptions.map(o => (
                 <option key={o.id} value={o.id}>{o.name}</option>
               ))}
             </select>
+            {!membersLoading && assigneeOptions.length === 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                No project members yet — task will be created unassigned. Add members from the Team page to assign later.
+              </p>
+            )}
           </div>
 
           <div>

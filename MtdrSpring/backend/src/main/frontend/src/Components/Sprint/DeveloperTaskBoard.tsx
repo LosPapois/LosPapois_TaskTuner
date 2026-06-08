@@ -293,6 +293,10 @@ export default function DeveloperTaskBoard({
                 role={d.subtitle}
                 selected={selectedDeveloperKey === d.key}
                 onSelect={() => onSelectDeveloper(d.key)}
+                // The 'unassigned' bucket is a synthetic group, not a real
+                // user — render it with the dashed/icon variant so it never
+                // gets confused with an actual developer.
+                isUnassigned={d.key === 'unassigned'}
               />
             ))}
           </div>

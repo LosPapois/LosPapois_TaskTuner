@@ -76,8 +76,9 @@ export default function ConfirmMemberDeleteModal({
             type="button"
             onClick={onConfirm}
             disabled={submitting}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl
-                       font-semibold shadow-sm transition-colors disabled:opacity-60"
+            className="flex-1 bg-brand-900 hover:bg-brand-800 text-white py-3 rounded-xl
+                       font-semibold shadow-sm shadow-brand-900/30
+                       transition-colors disabled:opacity-60"
           >
             {submitting ? 'Removing...' : 'Confirm Remove'}
           </button>

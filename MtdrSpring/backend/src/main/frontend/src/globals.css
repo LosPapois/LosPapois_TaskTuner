@@ -397,9 +397,9 @@
     @apply menu-item text-gray-700 hover:bg-orange-50;
   }
 
-  /** Menu item - danger (red) */
+  /** Menu item - danger (forest-green, brand-aware destructive treatment) */
   .menu-item-danger {
-    @apply menu-item text-red-600 hover:bg-red-50;
+    @apply menu-item text-brand-900 hover:bg-brand-lighter;
   }
 
   /** Icon button - navigation dark theme (mobile) */

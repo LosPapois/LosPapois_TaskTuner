@@ -36,6 +36,7 @@ import ProgressBar from '../Components/Common/ProgressBar';
 import Sparkline from '../Components/Common/Sparkline';
 import { getFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
 import { toast } from '../Utils/toast';
+import useIsProjectArchived from '../Hooks/useIsProjectArchived';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock data — visual-only until the sprint endpoints are wired.
@@ -157,6 +158,11 @@ export default function SprintPage() {
   const projectId = rawProjectId ? Number(rawProjectId) : undefined;
   const sprintId = rawSprintId ? Number(rawSprintId) : undefined;
   const navigate = useNavigate();
+
+  // When the project is archived we render in read-only mode: every Add /
+  // Edit / Delete control stays visible but disabled (gray) so the user
+  // still sees what could be done while the project was active.
+  const isReadOnly = useIsProjectArchived(projectId);
 
   // Resolve project name from the cached project list (filled by the sidebar).
   // When backend wiring lands this becomes a fetch keyed by projectId.
@@ -1051,7 +1057,11 @@ export default function SprintPage() {
             <button
               type="button"
               onClick={() => setShowEndConfirm(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors"
+              disabled={isReadOnly}
+              title={isReadOnly ? 'Read-only — project is archived' : undefined}
+              className={`inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors ${
+                isReadOnly ? 'opacity-50 cursor-not-allowed hover:bg-red-50' : ''
+              }`}
             >
               <StopIcon className="h-4 w-4" />
               Finalize Sprint
@@ -1179,9 +1189,13 @@ export default function SprintPage() {
               <button
                 type="button"
                 onClick={() => setShowAddTaskModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
+                disabled={isReadOnly}
+                title={isReadOnly ? 'Read-only — project is archived' : undefined}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
                            text-white bg-brand hover:bg-brand-dark rounded-lg shadow-sm
-                           transition-colors"
+                           transition-colors ${
+                             isReadOnly ? 'opacity-50 cursor-not-allowed hover:bg-brand' : ''
+                           }`}
               >
                 <span aria-hidden="true" className="text-base leading-none">+</span>
                 Add Task
@@ -1192,9 +1206,13 @@ export default function SprintPage() {
               <button
                 type="button"
                 onClick={() => setShowAddFeatureModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
+                disabled={isReadOnly}
+                title={isReadOnly ? 'Read-only — project is archived' : undefined}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
                            text-white bg-brand hover:bg-brand-dark rounded-lg shadow-sm
-                           transition-colors"
+                           transition-colors ${
+                             isReadOnly ? 'opacity-50 cursor-not-allowed hover:bg-brand' : ''
+                           }`}
               >
                 <span aria-hidden="true" className="text-base leading-none">+</span>
                 Add Feature

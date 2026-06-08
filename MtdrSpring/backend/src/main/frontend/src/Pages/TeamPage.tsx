@@ -25,6 +25,7 @@ import PageLoading from '../Components/Common/PageLoading';
 import ProgressBar from '../Components/Common/ProgressBar';
 import Sparkline from '../Components/Common/Sparkline';
 import useProjectKpis from '../Hooks/useProjectKpis';
+import useIsProjectArchived from '../Hooks/useIsProjectArchived';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock data — visual-only until the team / KPI endpoints are wired.
@@ -94,6 +95,10 @@ export default function TeamPage() {
   // which project's team we're viewing (no more cross-group highlight bugs).
   const { projectId: rawProjectId } = useParams<{ projectId: string }>();
   const projectId = rawProjectId ? Number(rawProjectId) : undefined;
+
+  // Archived projects render in read-only mode: every Add / Edit / Delete
+  // button stays visible but is grayed out and disabled.
+  const isReadOnly = useIsProjectArchived(projectId);
 
   // Members are seeded from per-project cache for instant paint, then
   // refreshed by the parallel fetch below. Mock projects (negative IDs)
@@ -904,9 +909,12 @@ export default function TeamPage() {
               <button
                 type="button"
                 onClick={handleOpenAddMember}
-                disabled={projectId == null || projectId < 0}
-                className="px-4 py-2.5 rounded-xl bg-brand text-white font-semibold text-sm
-                         hover:bg-brand-dark transition-colors disabled:opacity-60"
+                disabled={projectId == null || projectId < 0 || isReadOnly}
+                title={isReadOnly ? 'Read-only — project is archived' : undefined}
+                className={`px-4 py-2.5 rounded-xl bg-brand text-white font-semibold text-sm
+                         hover:bg-brand-dark transition-colors disabled:opacity-60 ${
+                           isReadOnly ? 'opacity-50 cursor-not-allowed hover:bg-brand' : ''
+                         }`}
               >
                 Add Team Member
               </button>
@@ -953,6 +961,7 @@ export default function TeamPage() {
                   onEdit={handleOpenEditMember}
                   onDelete={handleOpenDeleteMember}
                   onTaskClick={handleTaskClick}
+                  readOnly={isReadOnly}
                 />
               ) : (
                 <p className="text-sm text-gray-400 self-center text-center">

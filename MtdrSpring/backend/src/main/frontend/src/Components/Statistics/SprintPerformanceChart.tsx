@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ArrowTrendingUpIcon,
+  CalendarDaysIcon,
   ChevronDownIcon,
   ChartBarIcon,
   UserGroupIcon,
@@ -67,6 +68,17 @@ interface SprintPerformanceChartProps {
   sprintGroupWidthPx: number;
   chartMinWidthPx: number;
   memberNameById: Map<number, string>;
+  // Sprint filter — selectable list of sprints to display in the chart.
+  // Same pending/applied pattern as the member filter so the user can pick
+  // several sprints before pressing "Update Graph".
+  pendingSprintIds: number[];
+  isSprintMenuOpen: boolean;
+  sprintMenuRef: React.RefObject<HTMLDivElement>;
+  selectedSprintsLabel: string;
+  onToggleSprintMenu: () => void;
+  onSelectAllSprints: () => void;
+  onClearSprints: () => void;
+  onToggleSprint: (sprintId: number) => void;
 }
 
 export default function SprintPerformanceChart({
@@ -93,6 +105,14 @@ export default function SprintPerformanceChart({
   sprintGroupWidthPx,
   chartMinWidthPx,
   memberNameById,
+  pendingSprintIds,
+  isSprintMenuOpen,
+  sprintMenuRef,
+  selectedSprintsLabel,
+  onToggleSprintMenu,
+  onSelectAllSprints,
+  onClearSprints,
+  onToggleSprint,
 }: SprintPerformanceChartProps) {
   return (
     <section
@@ -108,7 +128,7 @@ export default function SprintPerformanceChart({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <label className="block">
           <span className="text-sm font-semibold text-gray-700 inline-flex items-center gap-1.5 mb-2">
             <UserGroupIcon className="h-4 w-4" aria-hidden="true" />
@@ -176,6 +196,81 @@ export default function SprintPerformanceChart({
           <p className="text-xs text-gray-500 mt-1">Pick one or more developers.</p>
         </label>
 
+        {/* Sprint multi-select — lets the user trim the X axis to a subset
+            of sprints (e.g. just the last 3 sprints). Default is "all". */}
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700 inline-flex items-center gap-1.5 mb-2">
+            <CalendarDaysIcon className="h-4 w-4" aria-hidden="true" />
+            Sprints
+          </span>
+          <div ref={sprintMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={onToggleSprintMenu}
+              disabled={sprints.length === 0}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left text-sm text-gray-700
+                         hover:border-gray-300 focus:border-brand focus:outline-none inline-flex items-center justify-between gap-2
+                         disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <span className="truncate">{selectedSprintsLabel}</span>
+              <ChevronDownIcon
+                className={`h-4 w-4 text-gray-500 transition-transform ${isSprintMenuOpen ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+
+            {isSprintMenuOpen && (
+              <div
+                className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg shadow-gray-200/70"
+                role="menu"
+                aria-label="Sprint selection"
+              >
+                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+                  <button
+                    type="button"
+                    onClick={onSelectAllSprints}
+                    className="text-xs font-semibold text-brand hover:text-brand-dark"
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClearSprints}
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div className="max-h-56 overflow-auto py-1">
+                  {sprints.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-400">No sprints to filter.</p>
+                  ) : (
+                    sprints.map(sprint => {
+                      const checked = pendingSprintIds.includes(sprint.sprId);
+                      return (
+                        <label
+                          key={sprint.sprId}
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => onToggleSprint(sprint.sprId)}
+                            className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+                          />
+                          <span className="truncate">{sprint.nameSprint}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Pick which sprints to display on the chart.</p>
+        </label>
+
         <label className="block">
           <span className="text-sm font-semibold text-gray-700 inline-flex items-center gap-1.5 mb-2">
             <ArrowTrendingUpIcon className="h-4 w-4" aria-hidden="true" />
@@ -191,7 +286,7 @@ export default function SprintPerformanceChart({
           </select>
         </label>
 
-        <div className="flex items-center translate-y-0.5">
+        <div className="flex items-end">
           <button
             type="button"
             onClick={onApply}
@@ -212,6 +307,8 @@ export default function SprintPerformanceChart({
           <p className="text-sm text-gray-400">This project has no sprints yet.</p>
         ) : appliedMemberIds.length === 0 ? (
           <p className="text-sm text-gray-400">Select at least one member and click Update Graph.</p>
+        ) : chartRows.length === 0 ? (
+          <p className="text-sm text-gray-400">No sprints selected — pick at least one from the Sprints menu and click Update Graph.</p>
         ) : (
           <div className="space-y-5">
             <div className="border border-gray-100 rounded-xl p-4 bg-gradient-to-b from-gray-50 to-white overflow-x-auto">

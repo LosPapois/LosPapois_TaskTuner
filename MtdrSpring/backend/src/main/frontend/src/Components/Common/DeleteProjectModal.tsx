@@ -235,7 +235,8 @@ export default function DeleteProjectModal({
               type="submit"
               disabled={loading}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white
-                         bg-red-600 hover:bg-red-700 transition-colors
+                         bg-brand-900 hover:bg-brand-800 transition-colors
+                         shadow-sm shadow-brand-900/30
                          disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Deleting…' : 'Delete project'}

@@ -60,6 +60,12 @@ export interface MemberDetailPanelProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onTaskClick?: (taskId: number) => void;
+  /**
+   * When true, the Edit / Delete buttons stay visible but are visually muted
+   * and disabled. Used when the project is archived — actions are not
+   * destroyed, just gated so users can still see what could be done.
+   */
+  readOnly?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,7 +184,8 @@ function MemberDetailPanel({
   tasks,
   onEdit,
   onDelete,
-  onTaskClick
+  onTaskClick,
+  readOnly = false,
 }: MemberDetailPanelProps) {
   // Filters + sort — controlled inputs above the task list. Reset when the
   // member changes so each panel starts fresh.
@@ -271,11 +278,23 @@ function MemberDetailPanel({
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
+          {/* Outlined / "ghost" button style: white surface, brand-colored
+              border + icon + label. Lighter visually than a solid fill, which
+              is what we want for trigger buttons in a detail panel — they
+              should sit quietly until you actually need them. Edit uses the
+              medium brand teal; Delete uses brand-900 (deepest forest green)
+              so it still reads as the heavier, more dangerous action without
+              breaking the palette. */}
           <button
             type="button"
             onClick={onEdit}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg
-                       bg-blue-500 hover:bg-blue-600 text-white transition-colors"
+            disabled={readOnly}
+            title={readOnly ? 'Read-only — project is archived' : undefined}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg
+                       bg-white border border-brand text-brand
+                       hover:bg-brand-lighter transition-colors shadow-sm ${
+                         readOnly ? 'opacity-50 cursor-not-allowed hover:bg-white' : ''
+                       }`}
           >
             <PencilSquareIcon className="h-4 w-4" aria-hidden="true" />
             Edit
@@ -283,8 +302,13 @@ function MemberDetailPanel({
           <button
             type="button"
             onClick={onDelete}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg
-                       bg-red-500 hover:bg-red-600 text-white transition-colors"
+            disabled={readOnly}
+            title={readOnly ? 'Read-only — project is archived' : undefined}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg
+                       bg-white border border-brand-900 text-brand-900
+                       hover:bg-brand-lighter transition-colors shadow-sm ${
+                         readOnly ? 'opacity-50 cursor-not-allowed hover:bg-white' : ''
+                       }`}
           >
             <TrashIcon className="h-4 w-4" aria-hidden="true" />
             Delete

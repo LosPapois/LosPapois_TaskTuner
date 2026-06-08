@@ -391,7 +391,12 @@ public class BotActions {
         }
 
         TaskTT task = taskTTService.getTaskById(taskId).orElse(null);
-        if (task == null || task.getUserId() != getAuthenticatedUser().getUserId()) {
+        // Null-safe ownership check: unassigned tasks (userId == null) belong
+        // to no one, so any user editing them via the bot is rejected here
+        // the same way as if the task wasn't theirs. Without the explicit null
+        // guard the `!=` below would unbox a null Long and throw NPE.
+        Long ownerId = task != null ? task.getUserId() : null;
+        if (task == null || ownerId == null || ownerId != getAuthenticatedUser().getUserId()) {
             BotHelper.sendMessageToTelegram(
                     chatId, "❌ Task not found or does not belong to you.", telegramClient, null);
             exit = true;
@@ -3089,7 +3094,10 @@ public class BotActions {
         }
 
         TaskTT task = taskTTService.getTaskById(taskId).orElse(null);
-        if (task == null || task.getUserId() != getAuthenticatedUser().getUserId()) {
+        // Same null-safe guard as elsewhere — unassigned tasks (userId == null)
+        // are treated as "not yours" so the bot won't let anyone edit them.
+        Long ownerId = task != null ? task.getUserId() : null;
+        if (task == null || ownerId == null || ownerId != getAuthenticatedUser().getUserId()) {
             BotHelper.sendMessageToTelegram(chatId, "❌ Task not found or does not belong to you.", telegramClient,
                     null);
             exit = true;

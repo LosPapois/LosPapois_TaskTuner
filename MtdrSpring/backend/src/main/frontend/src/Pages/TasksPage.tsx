@@ -540,9 +540,13 @@ export default function TasksPage() {
           const columnLabel =
             BOARD_COLUMNS.find(c => c.key === column)?.label ?? column;
           // Lookup assignee name from the users list TasksPage already loads
-          // on mount — falls back to the raw id if the user isn't cached yet.
-          const assignee = users.find(u => u.userId === task.userId);
-          const assigneeName = assignee ? assignee.nameUser : `User #${task.userId}`;
+          // on mount. Three cases: (1) task has no assignee — show "Unassigned";
+          // (2) assignee resolved — show their name; (3) assignee id exists but
+          // user isn't in cache yet — show raw id as a fallback.
+          const assignee = task.userId != null ? users.find(u => u.userId === task.userId) : null;
+          const assigneeName = task.userId == null
+            ? 'Unassigned'
+            : (assignee ? assignee.nameUser : `User #${task.userId}`);
           const fmtDate = (iso?: string | null) =>
             iso ? new Date(iso).toLocaleDateString() : '—';
 

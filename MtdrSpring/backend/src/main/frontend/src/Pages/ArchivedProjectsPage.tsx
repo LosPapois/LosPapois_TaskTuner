@@ -274,8 +274,8 @@ const ArchivedProjectCard = React.memo(function ArchivedProjectCard({
         }}
         className="absolute top-3 right-3 inline-flex items-center justify-center
                    rounded-md p-1.5 text-gray-400
-                   hover:bg-red-50 hover:text-red-600
-                   transition-colors focus:outline-2 focus:outline-red-500"
+                   hover:bg-brand-lighter hover:text-brand-900
+                   transition-colors focus:outline-2 focus:outline-brand-900"
       >
         <TrashIcon className="h-5 w-5" aria-hidden="true" />
       </button>

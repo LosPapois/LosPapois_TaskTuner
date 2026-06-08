@@ -19,11 +19,45 @@ export interface SidebarItemProps {
   active?: boolean;
   /** Optional density override for nested items (sprints under a project). */
   dense?: boolean;
+  /**
+   * When true, the item is grayed out and non-interactive: ignores `to` /
+   * `onClick`, drops mouse hover effects, shows a "not-allowed" cursor.
+   * Used to leave a once-meaningful entry visible (so the layout doesn't
+   * jump) while signaling that its purpose has been absorbed elsewhere.
+   */
+  disabled?: boolean;
+  /** Native tooltip — handy for explaining why something is disabled. */
+  title?: string;
 }
 
-function SidebarItem({ icon: Icon, label, to, onClick, active, dense }: SidebarItemProps) {
+function SidebarItem({
+  icon: Icon,
+  label,
+  to,
+  onClick,
+  active,
+  dense,
+  disabled,
+  title,
+}: SidebarItemProps) {
   const baseClass = dense ? 'sidebar-item-dense' : 'sidebar-item';
   const stateClass = active ? 'sidebar-item-active' : 'sidebar-item-idle';
+  const disabledClass = 'sidebar-item-idle text-gray-400 opacity-60 cursor-not-allowed pointer-events-none';
+
+  // Disabled: skip the link/button entirely and render a flat div, so
+  // keyboard tab navigation + screen readers also see it as inert.
+  if (disabled) {
+    return (
+      <div
+        className={`${baseClass} ${disabledClass}`}
+        title={title}
+        aria-disabled="true"
+      >
+        <Icon className="size-5 shrink-0" />
+        <span className="truncate">{label}</span>
+      </div>
+    );
+  }
 
   if (to) {
     return (
@@ -33,6 +67,7 @@ function SidebarItem({ icon: Icon, label, to, onClick, active, dense }: SidebarI
         className={({ isActive }) =>
           `${baseClass} ${isActive ? 'sidebar-item-active' : 'sidebar-item-idle'}`
         }
+        title={title}
       >
         <Icon className="size-5 shrink-0" />
         <span className="truncate">{label}</span>
@@ -46,6 +81,7 @@ function SidebarItem({ icon: Icon, label, to, onClick, active, dense }: SidebarI
       onClick={onClick}
       className={`${baseClass} ${stateClass}`}
       aria-current={active ? 'page' : undefined}
+      title={title}
     >
       <Icon className="size-5 shrink-0" />
       <span className="truncate">{label}</span>
