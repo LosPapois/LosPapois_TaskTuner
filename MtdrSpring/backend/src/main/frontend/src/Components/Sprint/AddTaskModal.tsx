@@ -16,6 +16,12 @@ export interface NewTaskData {
   userId: number | null;
   /** Optional feature to group this task under. */
   featureId?: number | null;
+  /**
+   * Edit-mode-only flag. The parent uses it to know whether to PATCH the
+   * sprint-task state to 'done' / 'active' after the regular PUT. Ignored
+   * in create mode (new tasks always start as 'active').
+   */
+  isCompleted?: boolean;
 }
 
 /** Lightweight feature shape the modal needs for the assignee dropdown. */
@@ -36,6 +42,9 @@ export interface InitialTaskValues {
   storyPoints?: number | null;
   userId?: number | null;
   featureId?: number | null;
+  /** Sprint-task state of the row being edited ('active' | 'done' | 'delayed').
+   *  Used to pre-fill the "Mark as completed" checkbox in edit mode. */
+  stateTask?: string | null;
 }
 
 export interface AddTaskModalProps {
@@ -83,6 +92,9 @@ const EMPTY_FORM = {
   // '' = "(No feature)" — sentinel that lets the dropdown stay controlled
   // while still expressing "leave the FK null".
   featureId: '' as number | '',
+  // Only meaningful in edit mode. The "Mark as completed" checkbox flips
+  // this; SprintPage uses it to PATCH the sprint-task state on save.
+  isCompleted: false,
 };
 
 /**
@@ -125,6 +137,9 @@ export default function AddTaskModal({
         storyPoints:    initialTask.storyPoints != null ? String(initialTask.storyPoints) : '',
         userId:         initialTask.userId ?? '',
         featureId:      initialTask.featureId ?? '',
+        // Pre-check the box only when the sprint-task row is currently
+        // 'done', so unticking it later flips back to 'active'.
+        isCompleted:    (initialTask.stateTask ?? '').toLowerCase() === 'done',
       });
     } else {
       setForm(EMPTY_FORM);
@@ -201,6 +216,8 @@ export default function AddTaskModal({
         userId: form.userId === '' ? null : Number(form.userId),
         // null = "no feature" (sentinel empty string) → unset the FK.
         featureId: form.featureId === '' ? null : Number(form.featureId),
+        // Only meaningful for the EDIT path. Parent ignores it on create.
+        isCompleted: isEditMode ? form.isCompleted : undefined,
       });
       onClose();
     } catch (err) {
@@ -229,6 +246,41 @@ export default function AddTaskModal({
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* "Mark as completed" — edit mode only. Lives at the top of the
+              form because it's the highest-impact toggle: flipping it changes
+              the sprint-task state (active <-> done) and the task's real end
+              date, which is visible everywhere (board, KPIs, statistics). */}
+          {isEditMode && (
+            <label
+              htmlFor="task-completed"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-colors
+                ${
+                  form.isCompleted
+                    ? 'bg-brand-lighter border-brand'
+                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                }`}
+            >
+              <input
+                id="task-completed"
+                type="checkbox"
+                checked={form.isCompleted}
+                onChange={e => setForm(p => ({ ...p, isCompleted: e.target.checked }))}
+                disabled={submitting}
+                className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+              />
+              <div className="flex-1">
+                <div className={`text-sm font-semibold ${form.isCompleted ? 'text-brand-900' : 'text-gray-700'}`}>
+                  Mark as completed
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {form.isCompleted
+                    ? 'Task will be moved to "Done" and stamped with today as its real end date.'
+                    : 'Task stays in its current state. Unchecking a previously completed task sends it back to "Active" — or "Delayed" if the due date has already passed.'}
+                </p>
+              </div>
+            </label>
+          )}
+
           <div>
             <label htmlFor="task-name" className="block text-sm font-semibold text-gray-800 mb-2">
               Task Name

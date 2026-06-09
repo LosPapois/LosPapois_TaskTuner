@@ -754,9 +754,37 @@ export default function SprintPage() {
 
     // ── EDIT ──────────────────────────────────────────────────────────
     if (taskToEdit) {
+      // "Mark as completed" comes in via data.isCompleted. We compute whether
+      // the user actually flipped the toggle (vs leaving it as-is), then:
+      //   - PUT updates the task fields, including dateEndRealTask (today on
+      //     transition to done, null on transition back).
+      //   - PATCH updates the sprint-task row's state.
+      // Both calls fire only when the state actually changed, so a normal
+      // edit (e.g. just renaming a task) doesn't hit the sprint-task endpoint.
+      const wasDone = taskToEdit.stateTask?.toLowerCase() === 'done';
+      const wantsDone = data.isCompleted === true;
+      const completionChanged = wasDone !== wantsDone;
+      const todayIso = new Date().toISOString().slice(0, 10);
+
+      // When un-completing a task we mirror what the sprint rollover would
+      // have set: if the task's due date already passed (i.e. the sprint
+      // window is over) the task is "delayed", otherwise it's just "active".
+      // This keeps manual edits consistent with the auto-rollover semantics
+      // — no special-casing required when the sprint later closes.
+      const dueDate = taskToEdit.dateEndSetTask;
+      const isPastDue = dueDate != null && dueDate < todayIso;
+      const unmarkState: 'delayed' | 'active' = isPastDue ? 'delayed' : 'active';
+
+      // dateEndRealTask follows the toggle. If completion didn't change we
+      // preserve whatever was there (a previously-completed task keeps its
+      // original end date even after editing other fields).
+      const nextRealEnd = completionChanged
+        ? (wantsDone ? todayIso : null)
+        : taskToEdit.dateEndRealTask;
+
       // PUT body must include the full TaskTT shape since updateTask sets
       // every field from the request body. We preserve fields the modal
-      // doesn't touch (dateStartTask, dateEndRealTask, featureId).
+      // doesn't touch (dateStartTask, featureId).
       const putBody = {
         taskId:          taskToEdit.taskId,
         nameTask:        data.nameTask,
@@ -769,7 +797,7 @@ export default function SprintPage() {
         // Due date is always the sprint's end date — the modal no longer
         // asks for it, so we keep every task aligned to its sprint window.
         dateEndSetTask:  sprintDto?.dateEndSpr ?? null,
-        dateEndRealTask: taskToEdit.dateEndRealTask,
+        dateEndRealTask: nextRealEnd,
         featureId:       data.featureId ?? null,
       };
       const putRes = await fetch(`/api/tasks/${taskToEdit.taskId}`, {
@@ -780,6 +808,28 @@ export default function SprintPage() {
       if (!putRes.ok) {
         throw new Error(`PUT /api/tasks/${taskToEdit.taskId} → ${putRes.status}`);
       }
+
+      // PATCH the sprint-task row's state only when the completion actually
+      // flipped. If the user didn't touch the checkbox we leave the state
+      // untouched (avoids resetting 'delayed' back to 'active' on a no-op).
+      //   wantsDone === true  → 'done'
+      //   wantsDone === false → 'delayed' (past-due) or 'active' (still in time)
+      // The composite PK on SPRINT_TASK_TT (spr_id, task_id) guarantees this
+      // call upserts a single row — no risk of duplicate sprint-task rows
+      // even if the rollover later touches the same (sprint, task) pair.
+      if (completionChanged && sprintId != null) {
+        const newState: 'done' | 'delayed' | 'active' = wantsDone ? 'done' : unmarkState;
+        const patchRes = await fetch(
+          `/api/sprint-tasks/${sprintId}/${taskToEdit.taskId}/state/${newState}`,
+          { method: 'PATCH' }
+        );
+        if (!patchRes.ok) {
+          throw new Error(
+            `PATCH /api/sprint-tasks/${sprintId}/${taskToEdit.taskId}/state/${newState} → ${patchRes.status}`
+          );
+        }
+      }
+
       setTaskRefreshToken(t => t + 1);
       return;
     }
