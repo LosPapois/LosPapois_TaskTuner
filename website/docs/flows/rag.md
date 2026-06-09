@@ -6,55 +6,31 @@ title: Flujo RAG (/ask)
 
 # Flujo RAG — Comando /ask
 
-```
-/ask "En base al doc, dime los hitos del proyecto"
-        │
-        ▼
-sanitizeAiInput() ── protección contra prompt injection
-        │
-        ▼
-buildRagContext() → VectorService.retrieveChunks(query, pjId)
-    │
-    ├─ 1. QUERY EXPANSION (Groq)
-    │       GroqService.ask(expansion_prompt, query)
-    │       → ["variante semántica 1", "variante semántica 2"]
-    │       + query original = 3 queries en total
-    │
-    ├─ 2. EMBEDDING (Cohere, con cache)
-    │       POST https://api.cohere.com/v2/embed
-    │       model: embed-multilingual-v3.0, input_type: search_query
-    │       → float[1024] por cada query (cacheado en ConcurrentHashMap)
-    │
-    ├─ 3. VECTOR SEARCH por cada embedding (Oracle 23ai)
-    │       SELECT content, VECTOR_DISTANCE(embedding, ?, COSINE) AS dist
-    │       FROM rag_chunks WHERE pj_id = ?
-    │       ORDER BY dist FETCH FIRST 21 ROWS ONLY  ← CANDIDATE_K = TOP_K * 3
-    │       WHERE dist < 0.70                       ← WIDE_THRESHOLD
-    │       → pool de candidatos, deduplicado por contenido (mejor score por chunk)
-    │
-    └─ 4. HYBRID RE-RANKING (Java)
-            extractKeywords(query) → filtra stopwords ES+EN
-            por cada chunk: adjusted = vector_dist - keyword_bonus
-            keyword_bonus = hits * 0.08, máx 0.30
-            sort por adjusted_score, top 7
-        │
-        ▼
-buildUnifiedAiPrompt()
-    └── buildContextString()
-        └── sprints + tareas + features actuales desde Oracle
-        │
-        ▼
-systemPrompt = prompt_base + contexto_oracle + "=== RELEVANT DOCUMENT EXCERPTS ===" + top-7 chunks
-        │
-        ▼
-GroqService.ask(systemPrompt, pregunta_usuario)
-    └── POST https://api.groq.com → Llama 3.3 70B
-        │
-        ▼
-Respuesta JSON parseada → tipo: answer/task/feature/suggest/off_topic
-        │
-        ▼
-BotHelper.sendMessageToTelegram()
+```mermaid
+flowchart TD
+    Ask(["/ask pregunta"]) --> Sanitize["🛡️ sanitizeAiInput()\n7 regex anti-injection"]
+    Sanitize --> Expand["1 · QUERY EXPANSION\nGroqService → Llama 3.3 70B\noriginal + 2 variantes semánticas"]
+    Expand --> Embed["2 · EMBEDDING\nCohere embed-multilingual-v3.0\nfloat[1024] por query\ncacheado en ConcurrentHashMap"]
+    Embed --> VSearch["3 · VECTOR SEARCH x3\nSELECT VECTOR_DISTANCE COSINE\nFETCH FIRST 21 ROWS WHERE dist &lt; 0.70\nOracle 23ai HNSW"]
+    VSearch --> Rerank["4 · HYBRID RE-RANKING\nextractKeywords → keyword_bonus\nadjusted = dist - hits×0.08\ntop 7 chunks"]
+    Rerank --> Prompt["buildUnifiedAiPrompt()\ncontexto Oracle + top-7 chunks"]
+    Prompt --> LLM["⚡ GroqService.ask()\nLlama 3.3 70B"]
+    LLM --> Parse["Parse JSON response\ntipo: answer/task/feature/suggest/off_topic"]
+    Parse --> Send["✅ BotHelper.sendMessageToTelegram()"]
+
+    classDef trigger fill:#DBEAFE,stroke:#2563EB,color:#1E3A5F
+    classDef security fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D
+    classDef ai fill:#FFEDD5,stroke:#EA580C,color:#7C2D12
+    classDef vector fill:#F3E8FF,stroke:#9333EA,color:#3B0764
+    classDef rerank fill:#FEF9C3,stroke:#CA8A04,color:#713F12
+    classDef done fill:#DCFCE7,stroke:#16A34A,color:#14532D
+
+    class Ask trigger
+    class Sanitize security
+    class Expand,LLM ai
+    class Embed,VSearch vector
+    class Rerank,Prompt rerank
+    class Parse,Send done
 ```
 
 Ver [decisiones de diseño del pipeline RAG](/docs/rag/overview) para el razonamiento detrás de cada etapa.

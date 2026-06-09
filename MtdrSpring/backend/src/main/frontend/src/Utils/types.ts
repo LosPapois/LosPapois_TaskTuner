@@ -9,7 +9,7 @@ export interface ProjectDTO {
   dateEndSetPj?: string | null;
   dateEndRealPj?: string | null;
   /** Project setting — when false, the user closes sprints manually via the */
-  /** "Terminar Sprint" button on SprintPage. */
+  /** "Finalize Sprint" button on SprintPage. */
   autoCloseSprints?: boolean;
   autoRollover?: boolean;
 }
@@ -33,9 +33,12 @@ export interface TaskDTO {
   dateStartTask?: string | null;
   dateEndSetTask?: string | null;
   dateEndRealTask?: string | null;
-  userId?: number;
+  /** Null when the task has no assignee (allowed since the USER_ID column
+   *  became nullable). UI should fall back to "Unassigned" in this case. */
+  userId?: number | null;
   pjId?: number;
   featureId?: number | null;
+  carriedOver?: boolean;
 }
 
 export interface SprintTaskDTO {

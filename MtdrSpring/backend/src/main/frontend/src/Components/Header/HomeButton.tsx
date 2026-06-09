@@ -15,7 +15,7 @@ function HomeButton() {
       onClick={() => navigate('/home')}
       aria-label="Go to Home"
       title="Home"
-      className="btn-icon-light text-gray-500 hover:text-brand-dark"
+      className="btn-icon-light text-white hover:text-white hover:bg-white/15"
     >
       <HomeIcon className="size-6" aria-hidden="true" />
     </button>

@@ -86,7 +86,7 @@ export default function AddProjectModal({
         aria-modal="true"
         aria-labelledby="add-project-title"
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7"
+        className="modal-card w-full max-w-md p-7"
       >
         <h2
           id="add-project-title"

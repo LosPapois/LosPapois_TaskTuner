@@ -25,6 +25,10 @@ export interface TaskDetailData {
   priority: TaskDetailPriority;
   developerName: string | null;
   state: string | null;
+  /** ISO date strings — when present, render a Dates section in the modal. */
+  dateStartTask?: string | null;
+  dateEndSetTask?: string | null;
+  dateEndRealTask?: string | null;
 }
 
 export interface TaskDetailModalProps {
@@ -79,7 +83,7 @@ export default function TaskDetailModal({
         aria-labelledby="task-detail-title"
         // Prevent clicks inside modal content from bubbling up and triggering onClose
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+        className="modal-card w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
@@ -145,6 +149,46 @@ export default function TaskDetailModal({
               )}
             </div>
           </div>
+
+          {/* Dates + Duration — only rendered when the parent passes any of */}
+          {/* the date fields. "Time to complete" is meaningful only when */}
+          {/* the task has actually been closed (real end date present). */}
+          {(task.dateStartTask || task.dateEndSetTask || task.dateEndRealTask) && (() => {
+            const fmt = (iso?: string | null) =>
+              iso ? new Date(iso).toLocaleDateString() : '—';
+            let duration = '—';
+            if (task.dateStartTask && task.dateEndRealTask) {
+              const start = new Date(task.dateStartTask).getTime();
+              const end = new Date(task.dateEndRealTask).getTime();
+              if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+                const days = Math.max(1, Math.ceil((end - start) / 86_400_000));
+                duration = `${days} ${days === 1 ? 'day' : 'days'}`;
+              }
+            }
+            return (
+              <div className="mt-6">
+                <div className="text-sm font-bold text-gray-800 mb-2">Dates</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Started</div>
+                    <div className="text-sm font-semibold text-gray-800">{fmt(task.dateStartTask)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Due</div>
+                    <div className="text-sm font-semibold text-gray-800">{fmt(task.dateEndSetTask)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Completed</div>
+                    <div className="text-sm font-semibold text-gray-800">{fmt(task.dateEndRealTask)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Duration</div>
+                    <div className="text-sm font-semibold text-gray-800">{duration}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer — destructive action lives on the far left, primary on the right */}

@@ -169,7 +169,7 @@ export default function ArchivedProjectsPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-gray-50 min-h-full px-6 py-12">
+    <div className="app-page-bg min-h-full px-6 py-12">
       <div className="max-w-5xl mx-auto">
         <header className="text-center mb-10">
           <span
@@ -252,10 +252,7 @@ const ArchivedProjectCard = React.memo(function ArchivedProjectCard({
           onSelect();
         }
       }}
-      className="relative text-left bg-white border border-gray-200 rounded-2xl p-6
-                 shadow-sm shadow-gray-200/60
-                 hover:shadow-md hover:-translate-y-0.5 hover:border-gray-400
-                 transition-all duration-200 cursor-pointer
+      className="relative text-left card-interactive
                  focus:outline-2 focus:outline-gray-500"
     >
       {/* Closed badge — pinned top-right next to the delete affordance so
@@ -277,8 +274,8 @@ const ArchivedProjectCard = React.memo(function ArchivedProjectCard({
         }}
         className="absolute top-3 right-3 inline-flex items-center justify-center
                    rounded-md p-1.5 text-gray-400
-                   hover:bg-red-50 hover:text-red-600
-                   transition-colors focus:outline-2 focus:outline-red-500"
+                   hover:bg-brand-lighter hover:text-brand-900
+                   transition-colors focus:outline-2 focus:outline-brand-900"
       >
         <TrashIcon className="h-5 w-5" aria-hidden="true" />
       </button>

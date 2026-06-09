@@ -114,7 +114,7 @@ export default function AddTeamMemberModal({
         aria-modal="true"
         aria-labelledby="add-team-member-title"
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-7"
+        className="modal-card w-full max-w-lg p-7"
       >
         <h2 id="add-team-member-title" className="text-xl font-bold text-gray-900 mb-5">
           {title ?? 'Add New Team Member'}

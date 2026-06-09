@@ -87,7 +87,7 @@ export default function AddSprintModal({
         aria-labelledby="add-sprint-title"
         // Stop bubbling so clicks inside the dialog don't close it.
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7"
+        className="modal-card w-full max-w-md p-7"
       >
         <h2
           id="add-sprint-title"

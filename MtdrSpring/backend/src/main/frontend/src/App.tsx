@@ -67,14 +67,13 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen app-page-bg">
       <Sidebar isOpen={sidebarOpen} />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* White header with a 2px brand-green underline — keeps the green */}
-        {/* present as an accent without doubling the dark-green wordmark */}
-        {/* that already lives in the sidebar. Fixed h-16 matches the */}
-        {/* sidebar header so the two zones align cleanly at the corner. */}
-        <header className="flex items-center gap-3 px-4 h-16 bg-white border-b-2 border-brand">
+        {/* Brand-green header — matches the sidebar header so the top row */}
+        {/* reads as a single coloured band across the whole app. h-16 keeps */}
+        {/* the seam flush with the sidebar wordmark on the left. */}
+        <header className="flex items-center gap-3 px-4 h-16 bg-brand">
           <SidebarToggle isOpen={sidebarOpen} onToggle={toggleSidebar} />
           <HomeButton />
           <PageBreadcrumb />

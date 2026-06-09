@@ -31,8 +31,12 @@ public class TaskTTController {
     private TaskTTService taskTTService;
 
     @GetMapping("/tasks")
-    public List<TaskTT> getAllTasks() {
-        return taskTTService.findAll();
+    public List<TaskTT> getAllTasks(@RequestParam(value = "sprId", required = false) Long sprId) {
+        List<TaskTT> tasks = taskTTService.findAll();
+        if (sprId != null && sprId > 0) {
+            taskTTService.populateCarriedOverFlags(tasks, sprId);
+        }
+        return tasks;
     }
 
     @GetMapping("/projects/{pjId}/tasks")

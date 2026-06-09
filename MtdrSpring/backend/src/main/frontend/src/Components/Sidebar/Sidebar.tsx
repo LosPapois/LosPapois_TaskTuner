@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArchiveBoxIcon,
   ArrowRightStartOnRectangleIcon,
+  ChevronRightIcon,
   PlusIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
@@ -71,7 +72,9 @@ function Sidebar({ isOpen }: SidebarProps) {
   // the backend / proxy is offline.
   const [projects, setProjects] = useState<ProjectDTO[]>(() => {
     const cached = getFromStorage<ProjectDTO[]>(STORAGE_KEYS.PROJECTS);
-    return cached && cached.length > 0 ? cached : MOCK_PROJECTS;
+    if (cached && cached.length > 0) return cached;
+    const currentUser = getFromStorage<SessionUser>(STORAGE_KEYS.USER);
+    return currentUser?.userId ? [] : MOCK_PROJECTS;
   });
 
   useEffect(() => {
@@ -95,14 +98,23 @@ function Sidebar({ isOpen }: SidebarProps) {
     };
   }, []);
 
-  // Sidebar only lists active projects — finalized ones live behind the
-  // dedicated /archive entry so the active workspace stays uncluttered.
+  // Sidebar splits projects into active vs archived sections. Active stays
+  // primary (top), archived gets a collapsed read-only section below so users
+  // can still drill into closed projects' Team/Statistics/Sprints for review.
   // Mock projects (negative pjId, no end date) are kept visible so the
   // offline preview still works.
   const activeProjects = useMemo(
     () => projects.filter(p => p.dateEndRealPj == null || p.dateEndRealPj === ''),
     [projects]
   );
+  const archivedProjects = useMemo(
+    () => projects.filter(p => p.dateEndRealPj != null && p.dateEndRealPj !== ''),
+    [projects]
+  );
+
+  // Archived section is collapsed by default — keeps the sidebar visually
+  // calm for the common case (working on active projects).
+  const [archivedSectionOpen, setArchivedSectionOpen] = useState(false);
 
   const handleSignOut = useCallback(() => {
     removeFromStorage(STORAGE_KEYS.AUTH_TOKEN);
@@ -307,10 +319,51 @@ function Sidebar({ isOpen }: SidebarProps) {
               />
             ))
           )}
+
+          {/* Archived projects — collapsible read-only section. Only renders
+              when there's at least one archived project, so it doesn't add
+              visual noise for fresh accounts. */}
+          {archivedProjects.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setArchivedSectionOpen(o => !o)}
+                aria-expanded={archivedSectionOpen}
+                className="sidebar-item w-full text-gray-500 hover:text-gray-700"
+              >
+                <ChevronRightIcon
+                  className={`size-4 shrink-0 transition-transform duration-150 ${
+                    archivedSectionOpen ? 'rotate-90' : ''
+                  }`}
+                  aria-hidden="true"
+                />
+                <ArchiveBoxIcon className="size-5 shrink-0" aria-hidden="true" />
+                <span className="truncate font-semibold uppercase text-[11px] tracking-wider">
+                  Archived ({archivedProjects.length})
+                </span>
+              </button>
+
+              {archivedSectionOpen && (
+                <div className="space-y-1 mt-1">
+                  {archivedProjects.map(p => (
+                    <SidebarProjectGroup
+                      key={p.pjId}
+                      projectId={p.pjId}
+                      projectName={p.namePj}
+                      defaultOpen={false}
+                      refreshToken={sprintVersions[p.pjId] ?? 0}
+                      readOnly
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="px-3 py-3 border-t border-gray-100 space-y-1">
-          <SidebarItem icon={ArchiveBoxIcon} label="Archive" to="/archive" />
+          {/* "Archive" entry removed — its purpose is fully covered by the
+              collapsible "Archived" section in the project list above. */}
           <SidebarItem icon={UserCircleIcon} label="Profile" to="/profile" />
           <SidebarItem
             icon={ArrowRightStartOnRectangleIcon}
