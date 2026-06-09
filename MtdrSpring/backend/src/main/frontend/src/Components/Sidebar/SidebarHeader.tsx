@@ -1,36 +1,28 @@
 import React from 'react';
 
 /**
- * Sidebar brand header: TaskTuner logo + name.
- * Pure presentational, no props — memoized to skip re-renders.
+ * Sidebar brand header: TaskTuner "TT" wordmark logo + name.
+ * Mirrors the AuthBrandHeader style used on Login/Signup so the brand
+ * identity stays consistent across the app. Pure presentational, memoized.
  */
 function SidebarHeader() {
   return (
-    // Solid brand-dark background turns the brand row into a proper "wordmark"
-    // bar — anchors the sidebar visually and uses the deepest green of the
-    // palette (#004D40). Logo + text switch to white for AA contrast.
+    // Solid brand background matches the "Add Project" primary button color
+    // so the brand row and the CTA below it read as a single visual identity.
     // h-16 matches the main header so the seam between the two is flush.
-    <div className="flex items-center gap-2 px-4 h-16 bg-brand-dark">
-      <svg
-        viewBox="0 0 32 32"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-7 w-7 text-white shrink-0"
+    <div className="flex items-center gap-3 px-4 h-16 bg-brand">
+      {/* TT block — white square with brand-dark text for high contrast
+          against the dark sidebar. Matches the size and shape of the
+          AuthBrandHeader logo on the Login/Signup pages. */}
+      <div
+        className="flex h-10 w-10 items-center justify-center rounded-2xl
+                   bg-white shadow-lg shadow-black/20 shrink-0"
         aria-hidden="true"
       >
-        <line x1="12" y1="4" x2="12" y2="8" />
-        <line x1="20" y1="4" x2="20" y2="8" />
-        <rect x="6" y="8" width="20" height="17" rx="5" />
-        <rect x="9.5" y="12" width="13" height="9" rx="3" />
-        <circle cx="13" cy="16.5" r="1.2" fill="currentColor" />
-        <circle cx="19" cy="16.5" r="1.2" fill="currentColor" />
-        <rect x="2.5" y="14" width="3.5" height="6" rx="1.2" />
-        <rect x="26" y="14" width="3.5" height="6" rx="1.2" />
-      </svg>
+        <span className="text-sm font-extrabold tracking-[0.22em] text-brand-dark">
+          TT
+        </span>
+      </div>
       <span className="text-lg font-bold text-white tracking-tight">TaskTuner</span>
     </div>
   );

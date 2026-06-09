@@ -59,7 +59,7 @@ public class SprintTTController {
     }
 
     /**
-     * Manual sprint termination — called when manager presses "Terminar Sprint"
+     * Manual sprint termination — called when manager presses "Finalize Sprint"
      * (project has autoCloseSprints=false). Closes the sprint and activates the
      * closest available next sprint. Returns the newly activated sprint, or 204
      * NO_CONTENT if none existed.

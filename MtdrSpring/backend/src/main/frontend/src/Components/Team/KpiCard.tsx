@@ -16,8 +16,12 @@ export interface KpiCardProps {
   label: string;
   /** Big bold value shown beneath the label (e.g. "50%", "2.9 days"). */
   value: string;
-  /** Heroicon component rendered inside the colored badge in the top-right. */
-  icon: React.ComponentType<{ className?: string }>;
+  /**
+   * Heroicon component rendered inside the colored badge in the top-right.
+   * Optional — when omitted, the label takes the full row and renders slightly
+   * larger so the card still has visual weight at the top.
+   */
+  icon?: React.ComponentType<{ className?: string }>;
   /** Visual tone applied to the icon badge. Defaults to brand. */
   tone?: KpiTone;
   /**
@@ -54,10 +58,22 @@ function KpiCard({ label, value, icon: Icon, tone = 'brand', children }: KpiCard
   return (
     <div className="card-interactive">
       <div className="flex items-start justify-between gap-3">
-        <span className="text-sm text-gray-500">{label}</span>
-        <span className={TONE_TO_ICON_CLASS[tone]} aria-hidden="true">
-          <Icon className="h-5 w-5" />
+        {/* When there's no icon, the label takes the full row and renders */}
+        {/* slightly larger so the card still reads with intent at the top. */}
+        <span
+          className={
+            Icon
+              ? 'text-sm text-gray-500'
+              : 'text-base font-semibold text-gray-700'
+          }
+        >
+          {label}
         </span>
+        {Icon && (
+          <span className={TONE_TO_ICON_CLASS[tone]} aria-hidden="true">
+            <Icon className="h-5 w-5" />
+          </span>
+        )}
       </div>
       {/* Brand-dark color tints every KPI value with the green palette — */}
       {/* one of the small accent points that distributes the brand across */}

@@ -48,14 +48,22 @@ public interface KpisRepository extends JpaRepository<TaskTT, Long> {
 
     @Query(value =
         "SELECT s.NAME_SPRINT AS sprint, " +
-        "       ROUND(SUM(CASE WHEN st.STATE_TASK = 'delayed' " +
-        "                 THEN t.STORY_POINTS * CASE t.PRIORITY WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END ELSE 0 END), 2) AS carried_points, " +
-        "       ROUND(SUM(t.STORY_POINTS * CASE t.PRIORITY WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END), 2) AS total_points, " +
+        "       COUNT(CASE WHEN EXISTS ( " +
+        "                        SELECT 1 FROM SPRINT_TASK_TT st_prev " +
+        "                        WHERE st_prev.TASK_ID = st.TASK_ID " +
+        "                        AND st_prev.SPR_ID < s.SPR_ID) " +
+        "                 THEN st.TASK_ID ELSE NULL END) AS carried_points, " +
+        "       COUNT(st.TASK_ID) AS total_points, " +
         "       ROUND( " +
-        "           SUM(CASE WHEN st.STATE_TASK = 'delayed' " +
-        "               THEN t.STORY_POINTS * CASE t.PRIORITY WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END ELSE 0 END) * 100.0 " +
-        "           / NULLIF(SUM(t.STORY_POINTS * CASE t.PRIORITY WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END), 0), 2 " +
-        "       ) AS rework_rate " +
+        "           COUNT(CASE WHEN EXISTS ( " +
+        "               SELECT 1 FROM SPRINT_TASK_TT st_prev " +
+        "               WHERE st_prev.TASK_ID = st.TASK_ID " +
+        "               AND st_prev.SPR_ID < s.SPR_ID) " +
+        "               THEN st.TASK_ID ELSE NULL END) * 100.0 " +
+        "           / NULLIF(COUNT(st.TASK_ID), 0), 2 " +
+        "       ) AS carryover_rate, " +
+        "       COUNT(CASE WHEN t.DATE_END_REAL_TASK > t.DATE_END_SET_TASK " +
+        "                 THEN st.TASK_ID ELSE NULL END) AS delayed_points " +
         "FROM SPRINT_TT s " +
         "JOIN SPRINT_TASK_TT st ON st.SPR_ID = s.SPR_ID " +
         "JOIN TASK_TT t ON t.TASK_ID = st.TASK_ID " +
@@ -119,14 +127,22 @@ public interface KpisRepository extends JpaRepository<TaskTT, Long> {
 
     @Query(value =
         "SELECT s.NAME_SPRINT AS sprint, " +
-        "       ROUND(SUM(CASE WHEN st.STATE_TASK = 'delayed' " +
-        "                 THEN t.STORY_POINTS * CASE t.PRIORITY WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END ELSE 0 END), 2) AS carried_points, " +
-        "       ROUND(SUM(t.STORY_POINTS * CASE t.PRIORITY WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END), 2) AS total_points, " +
+        "       COUNT(CASE WHEN EXISTS ( " +
+        "                        SELECT 1 FROM SPRINT_TASK_TT st_prev " +
+        "                        WHERE st_prev.TASK_ID = st.TASK_ID " +
+        "                        AND st_prev.SPR_ID < s.SPR_ID) " +
+        "                 THEN st.TASK_ID ELSE NULL END) AS carried_points, " +
+        "       COUNT(st.TASK_ID) AS total_points, " +
         "       ROUND( " +
-        "           SUM(CASE WHEN st.STATE_TASK = 'delayed' " +
-        "               THEN t.STORY_POINTS * CASE t.PRIORITY WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END ELSE 0 END) * 100.0 " +
-        "           / NULLIF(SUM(t.STORY_POINTS * CASE t.PRIORITY WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END), 0), 2 " +
-        "       ) AS rework_rate " +
+        "           COUNT(CASE WHEN EXISTS ( " +
+        "               SELECT 1 FROM SPRINT_TASK_TT st_prev " +
+        "               WHERE st_prev.TASK_ID = st.TASK_ID " +
+        "               AND st_prev.SPR_ID < s.SPR_ID) " +
+        "               THEN st.TASK_ID ELSE NULL END) * 100.0 " +
+        "           / NULLIF(COUNT(st.TASK_ID), 0), 2 " +
+        "       ) AS carryover_rate, " +
+        "       COUNT(CASE WHEN t.DATE_END_REAL_TASK > t.DATE_END_SET_TASK " +
+        "                 THEN st.TASK_ID ELSE NULL END) AS delayed_points " +
         "FROM SPRINT_TT s " +
         "JOIN SPRINT_TASK_TT st ON st.SPR_ID = s.SPR_ID " +
         "JOIN TASK_TT t ON t.TASK_ID = st.TASK_ID " +

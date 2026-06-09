@@ -1,11 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowTrendingUpIcon,
   CalendarIcon,
   CheckCircleIcon,
-  ClockIcon,
-  ExclamationCircleIcon,
   InboxIcon,
   StopIcon,
 } from '@heroicons/react/24/outline';
@@ -39,6 +36,7 @@ import ProgressBar from '../Components/Common/ProgressBar';
 import Sparkline from '../Components/Common/Sparkline';
 import { getFromStorage, saveToStorage, STORAGE_KEYS } from '../Utils/storage';
 import { toast } from '../Utils/toast';
+import useIsProjectArchived from '../Hooks/useIsProjectArchived';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock data — visual-only until the sprint endpoints are wired.
@@ -161,6 +159,11 @@ export default function SprintPage() {
   const sprintId = rawSprintId ? Number(rawSprintId) : undefined;
   const navigate = useNavigate();
 
+  // When the project is archived we render in read-only mode: every Add /
+  // Edit / Delete control stays visible but disabled (gray) so the user
+  // still sees what could be done while the project was active.
+  const isReadOnly = useIsProjectArchived(projectId);
+
   // Resolve project name from the cached project list (filled by the sidebar).
   // When backend wiring lands this becomes a fetch keyed by projectId.
   const projectName = useMemo(() => {
@@ -183,6 +186,10 @@ export default function SprintPage() {
   // Real features for this sprint (replaces MOCK_FEATURES). Comes from
   // /api/sprints/{sprId}/features which reads FEATURE_TT.
   const [rawFeatures, setRawFeatures] = useState<FeatureDTO[]>([]);
+
+  // Backend-calculated carryover rate for this sprint (from KPI retrabajo endpoint).
+  // Used in place of local weighted formula to ensure consistency with backend.
+  const [sprintCarryoverRate, setSprintCarryoverRate] = useState<number | null>(null);
 
   // userId → display name lookup, for "developer" badge on each feature.
   // Built from /api/users-tt — small payload, fetched once on mount.
@@ -215,7 +222,7 @@ export default function SprintPage() {
   const [featureToDelete, setFeatureToDelete] = useState<FeatureDTO | null>(null);
 
   // autoCloseSprints setting for the current project — if false, show manual
-  // "Terminar Sprint" button on active sprints.
+  // "Finalize Sprint" button on active sprints.
   const [autoCloseSprints, setAutoCloseSprints] = useState<boolean>(true); // optimistic default hides button until fetched
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [endingsprint, setEndingSprint] = useState(false);
@@ -273,17 +280,32 @@ export default function SprintPage() {
         /* Leave KPIs empty on failure — page falls back to ZERO_KPIS via memo. */
       });
 
-    Promise.allSettled([sprintRequest, featuresRequest, tasksRequest]).finally(() => {
+    // Fetch backend KPI data (retrabajo) to get authoritative carryover_rate for this sprint.
+    const kpisRequest = (sprintDto?.pjId ?? projectId)
+      ? fetch(`/api/projects/${sprintDto?.pjId ?? projectId}/kpis/retrabajo`)
+          .then(r => (r.ok ? r.json() : []))
+          .then((data: Array<{ sprint: string; carryover_rate: number }>) => {
+            if (cancelled) return;
+            // Find the metrics for the current sprint
+            const sprintData = data.find(s => s.sprint === sprintDto?.nameSprint);
+            setSprintCarryoverRate(sprintData?.carryover_rate ?? null);
+          })
+          .catch(() => {
+            setSprintCarryoverRate(null);
+          })
+      : Promise.resolve();
+
+    Promise.allSettled([sprintRequest, featuresRequest, tasksRequest, kpisRequest]).finally(() => {
       if (!cancelled) setSprintDataLoading(false);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [sprintId, taskRefreshToken]);
+  }, [sprintId, taskRefreshToken, projectId, sprintDto?.nameSprint, sprintDto?.pjId]);
 
   // Fetch project autoCloseSprints so we know whether to show the manual
-  // "Terminar Sprint" button. Runs whenever the sprint's pjId is known.
+  // "Finalize Sprint" button. Runs whenever the sprint's pjId is known.
   useEffect(() => {
     const pid = sprintDto?.pjId ?? projectId;
     if (pid == null || pid < 0) return;
@@ -298,14 +320,14 @@ export default function SprintPage() {
     return () => { cancelled = true; };
   }, [sprintDto?.pjId, projectId]);
 
-  // Handler for the "Terminar Sprint" button
+  // Handler for the "Finalize Sprint" button
   const handleEndSprint = useCallback(async () => {
     if (!sprintId) return;
     setEndingSprint(true);
     try {
       const res = await fetch(`/api/sprints/${sprintId}/end`, { method: 'PATCH' });
       if (!res.ok && res.status !== 204) {
-        toast('Failed to end sprint', 'error');
+        toast('Failed to finalize sprint', 'error');
         return;
       }
       // If a next sprint was activated, navigate there; otherwise go to project
@@ -318,7 +340,7 @@ export default function SprintPage() {
         navigate(`/projects/${projectId}`);
       }
     } catch {
-      toast('Failed to end sprint', 'error');
+      toast('Failed to finalize sprint', 'error');
     } finally {
       setEndingSprint(false);
       setShowEndConfirm(false);
@@ -350,11 +372,29 @@ export default function SprintPage() {
     && sprintId >= 0
     && (sprintDataLoading || usersLoading);
 
-  // KPIs are pure derivation — no extra state needed.
-  const computedKpis = useMemo(
-    () => computeSprintKpis(sprintTasks),
-    [sprintTasks]
-  );
+  // KPIs are computed from tasks, but carryRate is replaced with backend value
+  // to ensure accuracy (backend uses task count, not weighted points).
+  const computedKpis = useMemo(() => {
+    const kpis = computeSprintKpis(sprintTasks);
+    const delayedCount = sprintTasks.filter(
+      t => normalizeTaskState(t.stateTask) === 'delayed'
+    ).length;
+    // Override carryRate with the backend-calculated value if available
+    if (sprintCarryoverRate !== null) {
+      kpis.carryRate = Math.round(sprintCarryoverRate);
+      kpis.carriedFeatures = Math.round(
+        (sprintCarryoverRate / 100) * sprintTasks.length
+      );
+    }
+    if (sprintTasks.length > 0) {
+      kpis.taskDelay = Math.round((delayedCount / sprintTasks.length) * 100);
+      kpis.delayedTasks = delayedCount;
+    } else {
+      kpis.taskDelay = 0;
+      kpis.delayedTasks = 0;
+    }
+    return kpis;
+  }, [sprintTasks, sprintCarryoverRate]);
 
   // Enrich each backend Feature with stats computed from this sprint's tasks:
   // total/done counts, summed story points, the assigned developer (if all
@@ -692,6 +732,9 @@ export default function SprintPage() {
       priority: mapTaskPriority(taskDTO.priority),
       developerName: devName,
       state: displayTaskState(taskDTO.stateTask),
+      dateStartTask: taskDTO.dateStartTask,
+      dateEndSetTask: taskDTO.dateEndSetTask,
+      dateEndRealTask: taskDTO.dateEndRealTask,
     });
   };
 
@@ -711,9 +754,37 @@ export default function SprintPage() {
 
     // ── EDIT ──────────────────────────────────────────────────────────
     if (taskToEdit) {
+      // "Mark as completed" comes in via data.isCompleted. We compute whether
+      // the user actually flipped the toggle (vs leaving it as-is), then:
+      //   - PUT updates the task fields, including dateEndRealTask (today on
+      //     transition to done, null on transition back).
+      //   - PATCH updates the sprint-task row's state.
+      // Both calls fire only when the state actually changed, so a normal
+      // edit (e.g. just renaming a task) doesn't hit the sprint-task endpoint.
+      const wasDone = taskToEdit.stateTask?.toLowerCase() === 'done';
+      const wantsDone = data.isCompleted === true;
+      const completionChanged = wasDone !== wantsDone;
+      const todayIso = new Date().toISOString().slice(0, 10);
+
+      // When un-completing a task we mirror what the sprint rollover would
+      // have set: if the task's due date already passed (i.e. the sprint
+      // window is over) the task is "delayed", otherwise it's just "active".
+      // This keeps manual edits consistent with the auto-rollover semantics
+      // — no special-casing required when the sprint later closes.
+      const dueDate = taskToEdit.dateEndSetTask;
+      const isPastDue = dueDate != null && dueDate < todayIso;
+      const unmarkState: 'delayed' | 'active' = isPastDue ? 'delayed' : 'active';
+
+      // dateEndRealTask follows the toggle. If completion didn't change we
+      // preserve whatever was there (a previously-completed task keeps its
+      // original end date even after editing other fields).
+      const nextRealEnd = completionChanged
+        ? (wantsDone ? todayIso : null)
+        : taskToEdit.dateEndRealTask;
+
       // PUT body must include the full TaskTT shape since updateTask sets
       // every field from the request body. We preserve fields the modal
-      // doesn't touch (dateStartTask, dateEndRealTask, featureId).
+      // doesn't touch (dateStartTask, featureId).
       const putBody = {
         taskId:          taskToEdit.taskId,
         nameTask:        data.nameTask,
@@ -726,7 +797,7 @@ export default function SprintPage() {
         // Due date is always the sprint's end date — the modal no longer
         // asks for it, so we keep every task aligned to its sprint window.
         dateEndSetTask:  sprintDto?.dateEndSpr ?? null,
-        dateEndRealTask: taskToEdit.dateEndRealTask,
+        dateEndRealTask: nextRealEnd,
         featureId:       data.featureId ?? null,
       };
       const putRes = await fetch(`/api/tasks/${taskToEdit.taskId}`, {
@@ -737,6 +808,28 @@ export default function SprintPage() {
       if (!putRes.ok) {
         throw new Error(`PUT /api/tasks/${taskToEdit.taskId} → ${putRes.status}`);
       }
+
+      // PATCH the sprint-task row's state only when the completion actually
+      // flipped. If the user didn't touch the checkbox we leave the state
+      // untouched (avoids resetting 'delayed' back to 'active' on a no-op).
+      //   wantsDone === true  → 'done'
+      //   wantsDone === false → 'delayed' (past-due) or 'active' (still in time)
+      // The composite PK on SPRINT_TASK_TT (spr_id, task_id) guarantees this
+      // call upserts a single row — no risk of duplicate sprint-task rows
+      // even if the rollover later touches the same (sprint, task) pair.
+      if (completionChanged && sprintId != null) {
+        const newState: 'done' | 'delayed' | 'active' = wantsDone ? 'done' : unmarkState;
+        const patchRes = await fetch(
+          `/api/sprint-tasks/${sprintId}/${taskToEdit.taskId}/state/${newState}`,
+          { method: 'PATCH' }
+        );
+        if (!patchRes.ok) {
+          throw new Error(
+            `PATCH /api/sprint-tasks/${sprintId}/${taskToEdit.taskId}/state/${newState} → ${patchRes.status}`
+          );
+        }
+      }
+
       setTaskRefreshToken(t => t + 1);
       return;
     }
@@ -923,7 +1016,7 @@ export default function SprintPage() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-full px-6 py-8">
+    <div className="app-page-bg min-h-full px-6 py-8">
       <TaskDetailModal
         isOpen={selectedTaskForModal !== null}
         onClose={() => setSelectedTaskForModal(null)}
@@ -1005,7 +1098,7 @@ export default function SprintPage() {
             </div>
           </div>
 
-          {/* "Terminar Sprint" — visible only when sprint is active, has started, and autoCloseSprints=false */}
+          {/* "Finalize Sprint" — visible only when sprint is active, has started, and autoCloseSprints=false */}
           {sprintDto?.stateSprint === 'active'
             && !autoCloseSprints
             && sprintDto.dateStartSpr != null
@@ -1014,22 +1107,26 @@ export default function SprintPage() {
             <button
               type="button"
               onClick={() => setShowEndConfirm(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors"
+              disabled={isReadOnly}
+              title={isReadOnly ? 'Read-only — project is archived' : undefined}
+              className={`inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors ${
+                isReadOnly ? 'opacity-50 cursor-not-allowed hover:bg-red-50' : ''
+              }`}
             >
               <StopIcon className="h-4 w-4" />
-              Terminar Sprint
+              Finalize Sprint
             </button>
           )}
         </header>
 
-        {/* Terminar Sprint — confirm dialog */}
+        {/* Finalize Sprint — confirm dialog */}
         {showEndConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
-              <h2 className="heading-h4 before:hidden mb-3">Terminar Sprint</h2>
+            <div className="modal-card w-full max-w-sm p-8">
+              <h2 className="heading-h4 before:hidden mb-3">Finalize Sprint</h2>
               <p className="mt-3 text-sm text-gray-500">
-                ¿Seguro que quieres cerrar <span className="font-semibold text-gray-700">{sprint.name}</span>?
-                El siguiente sprint más próximo se activará automáticamente.
+                Are you sure you want to finalize <span className="font-semibold text-gray-700">{sprint.name}</span>?
+                The next sprint will be activated automatically.
               </p>
               <div className="mt-6 flex gap-3">
                 <button
@@ -1037,14 +1134,14 @@ export default function SprintPage() {
                   disabled={endingsprint}
                   className="flex-1 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
-                  Cancelar
+                  Cancel
                 </button>
                 <button
                   onClick={handleEndSprint}
                   disabled={endingsprint}
                   className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                 >
-                  {endingsprint ? 'Cerrando…' : 'Sí, terminar'}
+                  {endingsprint ? 'Finalizing…' : 'Yes, finalize'}
                 </button>
               </div>
             </div>
@@ -1063,7 +1160,6 @@ export default function SprintPage() {
           <KpiCard
             label="Sprint Progress"
             value={`${sprint.kpis.progress}%`}
-            icon={ArrowTrendingUpIcon}
             tone="success"
           >
             <ProgressBar value={sprint.kpis.progress} />
@@ -1072,29 +1168,26 @@ export default function SprintPage() {
           <KpiCard
             label="Carryover Rate"
             value={`${sprint.kpis.carryRate}%`}
-            icon={ExclamationCircleIcon}
             tone="warning"
           >
             <p className="text-xs text-gray-500">
-              {sprint.kpis.carriedFeatures} of {sprint.kpis.totalFeatures} carried over tasks
+              {sprint.kpis.carriedFeatures} {sprint.kpis.carriedFeatures === 1 ? 'task' : 'tasks'} carried over out of {sprint.kpis.totalFeatures} tasks
             </p>
           </KpiCard>
 
           <KpiCard
             label="Task Delay"
             value={`${sprint.kpis.taskDelay}%`}
-            icon={ExclamationCircleIcon}
             tone="danger"
           >
             <p className="text-xs text-gray-500">
-              {sprint.kpis.delayedTasks} delayed tasks
+              {sprint.kpis.delayedTasks} delayed {sprint.kpis.delayedTasks === 1 ? 'task' : 'tasks'}
             </p>
           </KpiCard>
 
           <KpiCard
             label="Cycle Time"
             value={sprint.kpis.cycleTime}
-            icon={ClockIcon}
             tone="info"
           >
             <Sparkline />
@@ -1146,9 +1239,13 @@ export default function SprintPage() {
               <button
                 type="button"
                 onClick={() => setShowAddTaskModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
+                disabled={isReadOnly}
+                title={isReadOnly ? 'Read-only — project is archived' : undefined}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
                            text-white bg-brand hover:bg-brand-dark rounded-lg shadow-sm
-                           transition-colors"
+                           transition-colors ${
+                             isReadOnly ? 'opacity-50 cursor-not-allowed hover:bg-brand' : ''
+                           }`}
               >
                 <span aria-hidden="true" className="text-base leading-none">+</span>
                 Add Task
@@ -1159,9 +1256,13 @@ export default function SprintPage() {
               <button
                 type="button"
                 onClick={() => setShowAddFeatureModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
+                disabled={isReadOnly}
+                title={isReadOnly ? 'Read-only — project is archived' : undefined}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
                            text-white bg-brand hover:bg-brand-dark rounded-lg shadow-sm
-                           transition-colors"
+                           transition-colors ${
+                             isReadOnly ? 'opacity-50 cursor-not-allowed hover:bg-brand' : ''
+                           }`}
               >
                 <span aria-hidden="true" className="text-base leading-none">+</span>
                 Add Feature

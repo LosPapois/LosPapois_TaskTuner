@@ -59,7 +59,7 @@ export default function useInactivityLogout(): UseInactivityLogoutReturn {
       }
 
       // Set new inactivity check
-      inactivityTimerRef.current = setTimeout(() => {
+      inactivityTimerRef.current = window.setTimeout(() => {
         checkInactivity();
       }, INACTIVITY_TIMEOUT);
     };
@@ -97,7 +97,7 @@ export default function useInactivityLogout(): UseInactivityLogoutReturn {
         if (inactivityTimerRef.current) {
           clearTimeout(inactivityTimerRef.current);
         }
-        inactivityTimerRef.current = setTimeout(checkInactivity, timeUntilTimeout);
+        inactivityTimerRef.current = window.setTimeout(checkInactivity, timeUntilTimeout);
       }
     };
 

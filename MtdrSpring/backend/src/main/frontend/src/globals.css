@@ -11,6 +11,19 @@
  * * Import this in your app after index.css to override/extend base styles.
  */
 
+/**
+ * Subtle dot-grid texture for the page background. Combines a base gray-100
+ * tint with a faint dot pattern so wide blank areas don't feel sterile.
+ * The opacity is so low the dots are perceived as "depth" rather than
+ * seen as a pattern.
+ */
+.app-page-bg {
+  background-color: #f3f4f6; /* gray-100 */
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.06) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
 @layer components {
   /* ========================================
      STATUS BADGES & TONE PATTERNS
@@ -80,13 +93,39 @@
      ======================================== */
 
   /** Base card - used for KPI cards, project cards, etc */
+  /* Floating look: pure white interior, generous radius, soft layered drop  */
+  /* shadow that suggests elevation without harsh edges. The 1px gray-100    */
+  /* border is a fallback so the card stays defined if shadows don't render. */
   .card-base {
-    @apply bg-white border border-gray-200 rounded-xl p-5 shadow-sm;
+    @apply bg-white border border-gray-100 rounded-2xl p-5
+           shadow-[0_3px_10px_rgba(15,23,42,0.05),0_10px_28px_rgba(15,23,42,0.07)];
   }
 
   /** Elevated card with hover effect */
+  /* Stacks a slightly deeper layered shadow on hover and lifts the card 2px */
+  /* so it tracks the cursor. Same color base so light/dark transitions stay */
+  /* coherent across hover states. */
   .card-interactive {
-    @apply card-base shadow-sm shadow-gray-200/60 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer;
+    @apply card-base hover:-translate-y-0.5
+           hover:shadow-[0_5px_14px_rgba(15,23,42,0.07),0_18px_36px_rgba(15,23,42,0.09)]
+           transition-all duration-200 cursor-pointer;
+  }
+
+  /** Inner panel — used inside a card to delimit sub-sections (mini KPIs, */
+  /* descriptions, filter rows). Uses the gray-50 tier of the bg hierarchy: */
+  /* page=gray-100  →  card=white  →  panel-inner=gray-50. */
+  .panel-inner {
+    @apply bg-gray-50 border border-gray-100 rounded-xl p-4;
+  }
+
+  /** Modal container — same Soft UI language as cards but with a deeper */
+  /* shadow because modals float above a black/40 backdrop and must clearly */
+  /* read as the topmost layer in the stack. Replace shadow-2xl etc. */
+  /* Note: callers add their own overflow rule (hidden for static modals, */
+  /* y-auto for scrollable ones) since the two policies are incompatible. */
+  .modal-card {
+    @apply bg-white border border-gray-100 rounded-2xl
+           shadow-[0_8px_24px_rgba(15,23,42,0.10),0_24px_48px_rgba(15,23,42,0.14)];
   }
 
   /** Card with brand accent */
@@ -108,9 +147,13 @@
     @apply max-w-7xl mx-auto;
   }
 
-  /** Section card - white card with border, rounded, shadow */
+  /** Section card - white card with the Soft UI floating shadow set. */
+  /* Reuses the same layered shadow as .card-base so big section panels */
+  /* (Team Members, Bar Graph, etc.) share the same depth language as */
+  /* the KPI cards inside them. */
   .section-card {
-    @apply bg-white border border-gray-200 rounded-xl p-6 shadow-sm shadow-gray-200/60;
+    @apply bg-white border border-gray-100 rounded-2xl p-6
+           shadow-[0_3px_10px_rgba(15,23,42,0.05),0_10px_28px_rgba(15,23,42,0.07)];
   }
 
   /** Section card with full-height flex layout */
@@ -354,9 +397,9 @@
     @apply menu-item text-gray-700 hover:bg-orange-50;
   }
 
-  /** Menu item - danger (red) */
+  /** Menu item - danger (forest-green, brand-aware destructive treatment) */
   .menu-item-danger {
-    @apply menu-item text-red-600 hover:bg-red-50;
+    @apply menu-item text-brand-900 hover:bg-brand-lighter;
   }
 
   /** Icon button - navigation dark theme (mobile) */

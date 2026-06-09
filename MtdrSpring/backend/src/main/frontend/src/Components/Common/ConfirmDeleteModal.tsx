@@ -86,26 +86,30 @@ export default function ConfirmDeleteModal({
         aria-modal="true"
         aria-labelledby="confirm-delete-title"
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="modal-card w-full max-w-md overflow-hidden"
       >
-        {/* Red header band — destructive intent should read at a glance */}
-        <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
-          <ExclamationTriangleIcon
-            className="h-7 w-7 text-white flex-shrink-0"
-            aria-hidden="true"
-          />
+        {/* Neutral header — warning conveyed by a tinted icon "chip" instead */}
+        {/* of a full red band, so the modal reads as a calm conversation */}
+        {/* rather than an alarm. */}
+        <div className="px-6 pt-6 pb-2 flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 flex-shrink-0">
+            <ExclamationTriangleIcon
+              className="h-6 w-6 text-red-600"
+              aria-hidden="true"
+            />
+          </span>
           <h2
             id="confirm-delete-title"
-            className="text-xl font-bold text-white"
+            className="text-xl font-bold text-gray-900"
           >
             {title}
           </h2>
         </div>
 
         <div className="px-6 py-5 space-y-4">
-          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
-            <p className="font-semibold">This action cannot be undone.</p>
-            <p className="mt-1">{message}</p>
+          <div className="text-sm text-gray-700">
+            <p className="font-semibold text-gray-900">This action cannot be undone.</p>
+            <p className="mt-1 text-gray-600">{message}</p>
           </div>
 
           {itemName && (
@@ -140,9 +144,9 @@ export default function ConfirmDeleteModal({
               type="button"
               onClick={handleConfirm}
               disabled={submitting}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-semibold
-                         hover:bg-red-700 transition-colors
-                         disabled:bg-red-300 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2 bg-brand-900 text-white rounded-lg font-semibold
+                         hover:bg-brand-800 transition-colors shadow-sm shadow-brand-900/30
+                         disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Deleting…' : confirmText}
             </button>
