@@ -38,7 +38,7 @@ export default function AddMemberModal({ isOpen, onClose, onSave, initialData }:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl shadow-brand-dark/30 w-full max-w-md mx-4 p-8">
+      <div className="modal-card w-full max-w-md mx-4 p-8">
         <h2 className="heading-page!">
           {isEditing ? 'Edit Member' : 'Add New Member'}
         </h2>

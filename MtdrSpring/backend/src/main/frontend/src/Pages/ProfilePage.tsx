@@ -6,7 +6,6 @@ import {
   ExclamationTriangleIcon,
   LockClosedIcon,
   TrashIcon,
-  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import {
   clearStorageByPattern,
@@ -135,7 +134,7 @@ export default function ProfilePage() {
 
   if (!user || !profile) {
     return (
-      <div className="bg-gray-50 min-h-full px-6 py-12">
+      <div className="app-page-bg min-h-full px-6 py-12">
         <p className="text-center text-gray-500">
           Sign in to view your profile.
         </p>
@@ -286,30 +285,50 @@ export default function ProfilePage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  return (
-    <div className="min-h-full bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm shadow-gray-200/60 border border-gray-200 overflow-hidden">
-        {/* Header banner */}
-        <div className="bg-brand-dark px-8 py-10 flex items-center gap-6">
-          <div className="bg-white rounded-full p-3">
-            <UserCircleIcon className="h-16 w-16 text-brand" aria-hidden="true" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">{profile.name}</h1>
-            <p className="text-brand-lighter text-sm mt-1">{displayRole(profile.role)}</p>
-          </div>
-        </div>
+  // Helper for read-only field rows in view mode. Keeps the JSX DRY since
+  // every field uses the same label + value structure.
+  const Field = ({
+    label,
+    value,
+    icon: Icon,
+  }: {
+    label: string;
+    value: string;
+    icon?: React.ComponentType<{ className?: string }>;
+  }) => (
+    <div className="min-w-0">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+        {label}
+      </p>
+      <div className="flex items-center gap-2 min-w-0">
+        {Icon && <Icon className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />}
+        <p className="text-base text-gray-900 font-medium truncate">{value}</p>
+      </div>
+    </div>
+  );
 
-        {/* Body */}
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-800">
+  return (
+    <div className="min-h-full app-page-bg py-8 px-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Page header — same hierarchy as the rest of the app. */}
+        <header>
+          <h1 className="text-2xl font-bold text-gray-900 m-0">My Profile</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage your account details and security settings.
+          </p>
+        </header>
+
+        {/* Profile Information card */}
+        <section className="card-base">
+          <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+            <h2 className="text-lg font-semibold text-gray-900 m-0">
               Profile Information
             </h2>
             {!isEditing && (
               <button
                 onClick={handleEdit}
-                className="px-5 py-2 border-2 border-brand text-brand rounded-full font-medium hover:bg-brand-lighter transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-white bg-brand rounded-lg
+                           hover:bg-brand-dark transition-colors shadow-sm"
               >
                 Edit Profile
               </button>
@@ -319,7 +338,7 @@ export default function ProfilePage() {
           {isEditing && draft ? (
             <form id="profile-form" onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Full Name
                 </label>
                 <input
@@ -327,17 +346,19 @@ export default function ProfilePage() {
                   required
                   value={draft.name}
                   onChange={e => handleChange('name', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg
+                             text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Role
                 </label>
                 <select
                   value={draft.role}
                   onChange={e => handleChange('role', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-white
+                             text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
                 >
                   {ROLE_OPTIONS.map(o => (
                     <option key={o.value} value={o.value}>
@@ -347,18 +368,19 @@ export default function ProfilePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Email
                 </label>
                 <input
                   type="email"
                   value={draft.email}
                   onChange={e => handleChange('email', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg
+                             text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Telegram ID
                 </label>
                 <input
@@ -366,95 +388,36 @@ export default function ProfilePage() {
                   required
                   value={draft.telegramId}
                   onChange={e => handleChange('telegramId', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg
+                             text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
                 />
               </div>
 
               {error && (
                 <p
                   role="alert"
-                  className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3"
+                  className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3"
                 >
                   {error}
                 </p>
               )}
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  disabled={saving}
-                  className="flex-1 px-5 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-60"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 px-5 py-2 bg-brand text-white rounded-lg font-medium hover:bg-brand-dark transition-colors disabled:opacity-60"
-                >
-                  {saving ? 'Saving…' : 'Save Changes'}
-                </button>
-              </div>
             </form>
           ) : (
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-500">Full Name</p>
-                <p className="text-lg text-gray-900 font-medium">{profile.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Role</p>
-                <p className="text-lg text-gray-900 font-medium">{displayRole(profile.role)}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <EnvelopeIcon
-                  className="h-5 w-5 text-gray-400"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <p className="text-lg text-gray-900 font-medium">
-                    {profile.email || '—'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <ChatBubbleOvalLeftIcon
-                  className="h-5 w-5 text-gray-400"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="text-sm text-gray-500">Telegram</p>
-                  <p className="text-lg text-gray-900 font-medium">
-                    {profile.telegramId}
-                  </p>
-                </div>
-              </div>
-            </div>
+            // View mode: clean 2-column grid (collapses to 1 col on mobile).
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+              <Field label="Full Name" value={profile.name} />
+              <Field label="Role" value={displayRole(profile.role)} />
+              <Field label="Email" value={profile.email || '—'} icon={EnvelopeIcon} />
+              <Field label="Telegram" value={profile.telegramId} icon={ChatBubbleOvalLeftIcon} />
+            </dl>
           )}
 
-          {/* Delete account — destructive action, only shown when not editing */}
-          {!isEditing && (
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={openDeleteModal}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-              >
-                <TrashIcon className="h-5 w-5" aria-hidden="true" />
-                Delete My Account
-              </button>
-            </div>
-          )}
-
-          {/* Password section — fields live inside the same form as profile */}
-          {/* (no nested <form>!), so they submit together via handleSave. */}
-          {/* Leaving both empty keeps the existing password untouched. */}
+          {/* Password section — only when editing. Inputs use form="profile-form" */}
+          {/* so they submit together via handleSave without nesting <form>. */}
           {isEditing && (
-            <div className="mt-8 pt-8 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <LockClosedIcon className="h-5 w-5" />
+            <div className="mt-8 pt-6 border-t border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900 mb-1.5 flex items-center gap-2">
+                <LockClosedIcon className="h-4 w-4 text-gray-500" aria-hidden="true" />
                 Change Password
               </h3>
               <p className="text-xs text-gray-500 mb-4">
@@ -462,7 +425,7 @@ export default function ProfilePage() {
               </p>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     New Password
                   </label>
                   <input
@@ -470,12 +433,13 @@ export default function ProfilePage() {
                     value={passwords.newPass}
                     onChange={e => handlePasswordChange('newPass', e.target.value)}
                     form="profile-form"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg
+                               text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
                     autoComplete="new-password"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Confirm New Password
                   </label>
                   <input
@@ -483,14 +447,70 @@ export default function ProfilePage() {
                     value={passwords.confirm}
                     onChange={e => handlePasswordChange('confirm', e.target.value)}
                     form="profile-form"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg
+                               text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
                     autoComplete="new-password"
                   />
                 </div>
               </div>
             </div>
           )}
-        </div>
+
+          {/* Action buttons for edit mode — sit at the bottom of the same card. */}
+          {isEditing && (
+            <div className="mt-8 pt-6 border-t border-gray-100 flex gap-3">
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={saving}
+                className="flex-1 px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg
+                           text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="profile-form"
+                disabled={saving}
+                className="flex-1 px-5 py-2.5 bg-brand text-white rounded-lg
+                           text-sm font-semibold hover:bg-brand-dark transition-colors disabled:opacity-60"
+              >
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* Danger Zone — separate card so it doesn't bleed into the calm */}
+        {/* profile section. Visually distinct via red icon + red CTA. */}
+        {!isEditing && (
+          <section className="card-base">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex items-start gap-3 min-w-0">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 flex-shrink-0">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900 m-0">
+                    Danger Zone
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Permanently delete your account. This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={openDeleteModal}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold
+                           text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-sm"
+              >
+                <TrashIcon className="h-4 w-4" aria-hidden="true" />
+                Delete My Account
+              </button>
+            </div>
+          </section>
+        )}
       </div>
 
       {/* ─── Delete-account confirmation modal ──────────────────────────── */}
@@ -501,24 +521,28 @@ export default function ProfilePage() {
           aria-modal="true"
           aria-labelledby="delete-modal-title"
         >
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
-              <ExclamationTriangleIcon
-                className="h-7 w-7 text-white"
-                aria-hidden="true"
-              />
+          <div className="modal-card w-full max-w-md overflow-hidden">
+            {/* Neutral header with a red icon chip — same calm treatment as */}
+            {/* ConfirmDeleteModal so all destructive actions feel coherent. */}
+            <div className="px-6 pt-6 pb-2 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 flex-shrink-0">
+                <ExclamationTriangleIcon
+                  className="h-6 w-6 text-red-600"
+                  aria-hidden="true"
+                />
+              </span>
               <h2
                 id="delete-modal-title"
-                className="text-xl font-bold text-white"
+                className="text-xl font-bold text-gray-900"
               >
                 Delete account permanently
               </h2>
             </div>
 
             <div className="px-6 py-5 space-y-4">
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
-                <p className="font-semibold">This action cannot be undone.</p>
-                <p className="mt-1">
+              <div className="text-sm text-gray-700">
+                <p className="font-semibold text-gray-900">This action cannot be undone.</p>
+                <p className="mt-1 text-gray-600">
                   Your account, profile, and access to all projects will be
                   removed immediately.
                 </p>

@@ -121,6 +121,15 @@ export default function StatisticsPage() {
   const [appliedMemberIds, setAppliedMemberIds] = useState<number[]>([]);
   const [appliedMetric, setAppliedMetric] = useState<MetricKey>('tasksCompleted');
 
+  // Sprint filter — mirrors the member filter pattern. Defaults to "all sprints"
+  // so the chart matches the prior behavior on first render. The pending vs
+  // applied split lets the user check/uncheck several sprints before pressing
+  // "Update Graph" instead of re-rendering on every checkbox click.
+  const [pendingSprintIds, setPendingSprintIds] = useState<number[]>([]);
+  const [appliedSprintIds, setAppliedSprintIds] = useState<number[]>([]);
+  const [isSprintMenuOpen, setIsSprintMenuOpen] = useState(false);
+  const sprintMenuRef = useRef<HTMLDivElement | null>(null);
+
   // Active sprint data for pie chart and project progress
   const [activeSprint, setActiveSprint] = useState<SprintDTO | null>(null);
   const [activeSprintEndDate, setActiveSprintEndDate] = useState<string | null>(null);
@@ -129,9 +138,11 @@ export default function StatisticsPage() {
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
-      if (!memberMenuRef.current) return;
-      if (!memberMenuRef.current.contains(event.target as Node)) {
+      if (memberMenuRef.current && !memberMenuRef.current.contains(event.target as Node)) {
         setIsMemberMenuOpen(false);
+      }
+      if (sprintMenuRef.current && !sprintMenuRef.current.contains(event.target as Node)) {
+        setIsSprintMenuOpen(false);
       }
     };
 
@@ -262,6 +273,13 @@ export default function StatisticsPage() {
   setAllTasks(allTasks);
   setSprintTaskLinksById(nextSprintTaskLinksById);
 
+        // Seed sprint filter with every available sprint so the default view
+        // matches the prior behavior (all sprints shown). Users can then
+        // uncheck the ones they want hidden and press Update Graph.
+        const allSprintIds = visibleSprints.map(s => s.sprId);
+        setPendingSprintIds(allSprintIds);
+        setAppliedSprintIds(allSprintIds);
+
         // Calculate project progress based on all unique tasks in all sprints.
         // A task's final status is whatever it was in its latest sprint.
         const latestTaskStatus = new Map<number, string>();
@@ -363,18 +381,21 @@ export default function StatisticsPage() {
   }, [projectId]);
 
   const chartRows = useMemo(() => {
-    return seriesBySprint.map(point => ({
-      sprintId: point.sprintId,
-      sprintName: point.sprintName,
-      values: appliedMemberIds.map(memberId => ({
-        memberId,
-        value:
-          appliedMetric === 'tasksCompleted'
-            ? (point.tasksCompletedByMemberId[memberId] ?? 0)
-            : (point.storyPointsCompletedByMemberId[memberId] ?? 0),
-      })),
-    }));
-  }, [seriesBySprint, appliedMemberIds, appliedMetric]);
+    const visibleSet = new Set(appliedSprintIds);
+    return seriesBySprint
+      .filter(point => visibleSet.has(point.sprintId))
+      .map(point => ({
+        sprintId: point.sprintId,
+        sprintName: point.sprintName,
+        values: appliedMemberIds.map(memberId => ({
+          memberId,
+          value:
+            appliedMetric === 'tasksCompleted'
+              ? (point.tasksCompletedByMemberId[memberId] ?? 0)
+              : (point.storyPointsCompletedByMemberId[memberId] ?? 0),
+        })),
+      }));
+  }, [seriesBySprint, appliedMemberIds, appliedMetric, appliedSprintIds]);
 
   const memberNameById = useMemo(
     () => new Map(members.map(m => [m.id, m.name])),
@@ -433,7 +454,9 @@ export default function StatisticsPage() {
   const handleApply = () => {
     setAppliedMemberIds(pendingMemberIds);
     setAppliedMetric(pendingMetric);
+    setAppliedSprintIds(pendingSprintIds);
     setIsMemberMenuOpen(false);
+    setIsSprintMenuOpen(false);
   };
 
   const togglePendingMember = (memberId: number) => {
@@ -461,9 +484,40 @@ export default function StatisticsPage() {
     return `${pendingMemberIds.length} members selected`;
   }, [pendingMemberIds, members.length, memberNameById]);
 
+  // ─── Sprint filter helpers (mirror the member helpers above) ─────────────
+  const togglePendingSprint = (sprintId: number) => {
+    setPendingSprintIds(prev =>
+      prev.includes(sprintId)
+        ? prev.filter(id => id !== sprintId)
+        : [...prev, sprintId]
+    );
+  };
+
+  const selectAllSprints = () => {
+    setPendingSprintIds(sprints.map(s => s.sprId));
+  };
+
+  const clearSprintSelection = () => {
+    setPendingSprintIds([]);
+  };
+
+  const sprintNameById = useMemo(
+    () => new Map(sprints.map(s => [s.sprId, s.nameSprint])),
+    [sprints]
+  );
+
+  const selectedSprintsLabel = useMemo(() => {
+    if (pendingSprintIds.length === 0) return 'No sprints selected';
+    if (pendingSprintIds.length === sprints.length) return 'All sprints selected';
+    if (pendingSprintIds.length === 1) {
+      return sprintNameById.get(pendingSprintIds[0]) ?? '1 sprint selected';
+    }
+    return `${pendingSprintIds.length} sprints selected`;
+  }, [pendingSprintIds, sprints.length, sprintNameById]);
+
   if (loading) {
     return (
-      <div className="bg-gray-50 min-h-full px-6 py-8">
+      <div className="app-page-bg min-h-full px-6 py-8">
         <div className="container-main">
           <PageLoading
             title="Loading project statistics..."
@@ -475,7 +529,7 @@ export default function StatisticsPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-full px-6 py-8">
+    <div className="app-page-bg min-h-full px-6 py-8">
       <div className="container-main space-y-8">
         <header>
           <h1 className="heading-h2">
@@ -521,11 +575,20 @@ export default function StatisticsPage() {
             sprintGroupWidthPx={sprintGroupWidthPx}
             chartMinWidthPx={chartMinWidthPx}
             memberNameById={memberNameById}
+            // Sprint filter — same pending/applied dance as members.
+            pendingSprintIds={pendingSprintIds}
+            isSprintMenuOpen={isSprintMenuOpen}
+            sprintMenuRef={sprintMenuRef}
+            selectedSprintsLabel={selectedSprintsLabel}
+            onToggleSprintMenu={() => setIsSprintMenuOpen(open => !open)}
+            onSelectAllSprints={selectAllSprints}
+            onClearSprints={clearSprintSelection}
+            onToggleSprint={togglePendingSprint}
           />
 
           {/* Right Column: Widgets */}
           <div className="flex flex-col gap-6 h-full">
-            <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col flex-1">
+            <section className="section-card-flex flex-1">
               <div className="mb-4">
                 <h3 className="text-sm font-bold text-gray-900">Sprint Task Distribution</h3>
                 {activeSprint && (
@@ -554,9 +617,6 @@ export default function StatisticsPage() {
             />
           </div>
         </div>
-
-
-        <CycleTimeScatterPlot projectId={projectId} />
       </div>
 
       <CloseProjectModal

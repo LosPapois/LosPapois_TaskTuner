@@ -167,7 +167,7 @@ export default function HomePage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-gray-50 min-h-full px-6 py-12">
+    <div className="app-page-bg min-h-full px-6 py-12">
       <div className="max-w-5xl mx-auto">
         <header className="text-center mb-10">
           <h1 className="heading-h1">
@@ -244,10 +244,8 @@ const ProjectCard = React.memo(function ProjectCard({
           onSelect();
         }
       }}
-      className="relative text-left bg-white border border-gray-200 rounded-2xl p-6
-                 shadow-sm shadow-gray-200/60
-                 hover:shadow-md hover:-translate-y-0.5 hover:border-brand
-                 transition-all duration-200 cursor-pointer
+      className="relative text-left card-interactive
+                 hover:border-brand
                  focus:outline-2 focus:outline-brand-dark"
     >
       {/* Floating delete affordance — stops propagation so it doesn't trigger

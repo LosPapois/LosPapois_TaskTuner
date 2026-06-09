@@ -97,15 +97,15 @@ export default function PageBreadcrumb() {
         {crumbs.map((c, i) => (
           <li key={i} className="flex items-center gap-2">
             {i > 0 && (
-              <span className="text-gray-300" aria-hidden="true">
+              <span className="text-white/50" aria-hidden="true">
                 /
               </span>
             )}
             <span
               className={
                 c.current
-                  ? 'font-semibold text-brand-dark'
-                  : 'text-gray-500'
+                  ? 'font-semibold text-white'
+                  : 'text-white/80'
               }
               aria-current={c.current ? 'page' : undefined}
             >

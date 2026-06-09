@@ -33,7 +33,9 @@ export interface TaskDTO {
   dateStartTask?: string | null;
   dateEndSetTask?: string | null;
   dateEndRealTask?: string | null;
-  userId?: number;
+  /** Null when the task has no assignee (allowed since the USER_ID column
+   *  became nullable). UI should fall back to "Unassigned" in this case. */
+  userId?: number | null;
   pjId?: number;
   featureId?: number | null;
   carriedOver?: boolean;

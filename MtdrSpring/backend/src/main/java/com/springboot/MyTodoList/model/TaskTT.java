@@ -36,8 +36,14 @@ public class TaskTT {
     @Column(name = "FEATURE_ID")
     private Long featureId;
 
-    @Column(name = "USER_ID", nullable = false)
-    private long userId;
+    /**
+     * Optional assignee. A task may exist in a sprint without anyone
+     * assigned yet — useful for sprint planning where the team drops
+     * stories into the sprint and only later decides who picks them up.
+     * Stored as boxed Long so it can be null.
+     */
+    @Column(name = "USER_ID")
+    private Long userId;
 
     @Column(name = "PJ_ID", nullable = false)
     private long pjId;
@@ -52,7 +58,7 @@ public class TaskTT {
     public TaskTT(long taskId, String nameTask, Integer storyPoints,
                   LocalDate dateStartTask, LocalDate dateEndSetTask,
                   LocalDate dateEndRealTask, String priority, String infoTask,
-                  Long featureId, long userId, long pjId) {
+                  Long featureId, Long userId, long pjId) {
         this.taskId          = taskId;
         this.nameTask        = nameTask;
         this.storyPoints     = storyPoints;
@@ -95,8 +101,8 @@ public class TaskTT {
     public Long getFeatureId()                       { return featureId; }
     public void setFeatureId(Long featureId)         { this.featureId = featureId; }
 
-    public long getUserId()                          { return userId; }
-    public void setUserId(long userId)               { this.userId = userId; }
+    public Long getUserId()                          { return userId; }
+    public void setUserId(Long userId)               { this.userId = userId; }
 
     public long getPjId()                            { return pjId; }
     public void setPjId(long pjId)                   { this.pjId = pjId; }

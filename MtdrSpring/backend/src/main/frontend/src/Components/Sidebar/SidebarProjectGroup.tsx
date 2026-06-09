@@ -40,6 +40,17 @@ export interface SidebarProjectGroupProps {
   onProjectClosed?: (projectId: number) => void;
   onProjectDeleted?: (projectId: number) => void;
   onProjectUpdated?: (projectId: number, name: string, autoRollover: boolean, autoCloseSprints: boolean) => void;
+  /**
+   * When true, render the group in read-only mode:
+   *   - hides the three-dots options menu (Settings / Close / Delete)
+   *   - hides the "Add Sprint" button
+   *   - mutes the project label visually to signal archived state
+   *
+   * Used for the "Archived" section of the sidebar so users can still
+   * navigate into closed projects' Team/Statistics/Sprints, but cannot
+   * modify them from the sidebar.
+   */
+  readOnly?: boolean;
 }
 
 interface SprintDTO {
@@ -90,7 +101,7 @@ function ProjectSettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+      <div className="modal-card w-full max-w-md p-8">
         <h2 className="text-2xl font-bold text-gray-900">Project Settings</h2>
 
         <div className="mt-6 space-y-5">
@@ -187,6 +198,7 @@ function SidebarProjectGroup({
   onProjectClosed,
   onProjectDeleted,
   onProjectUpdated,
+  readOnly = false,
 }: SidebarProjectGroupProps) {
   const [isOpen, setIsOpen] = useState<boolean>(defaultOpen);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -279,8 +291,10 @@ function SidebarProjectGroup({
           <span className="truncate">{projectName}</span>
         </button>
 
-        {/* Three-dots button — portal dropdown escapes sidebar overflow-hidden */}
-        {projectId > 0 && (
+        {/* Three-dots button — portal dropdown escapes sidebar overflow-hidden.
+            Hidden entirely in read-only (archived) mode: editing / closing /
+            deleting an archived project is not allowed from this entry. */}
+        {projectId > 0 && !readOnly && (
           <div className="shrink-0 mr-1">
             <button
               ref={menuBtnRef}
@@ -375,14 +389,18 @@ function SidebarProjectGroup({
             ))
           )}
 
-          <button
-            type="button"
-            onClick={handleAddSprint}
-            className="sidebar-item-dense text-brand-dark hover:bg-brand-lighter"
-          >
-            <PlusIcon className="size-5 shrink-0" aria-hidden="true" />
-            <span className="truncate">Add Sprint</span>
-          </button>
+          {/* "Add Sprint" hidden for archived projects — sprints in a closed
+              project are historical, no new ones are created. */}
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={handleAddSprint}
+              className="sidebar-item-dense text-brand-dark hover:bg-brand-lighter"
+            >
+              <PlusIcon className="size-5 shrink-0" aria-hidden="true" />
+              <span className="truncate">Add Sprint</span>
+            </button>
+          )}
         </div>
       )}
 

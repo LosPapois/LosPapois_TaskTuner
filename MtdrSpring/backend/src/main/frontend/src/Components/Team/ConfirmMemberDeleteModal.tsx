@@ -39,7 +39,7 @@ export default function ConfirmMemberDeleteModal({
         aria-modal="true"
         aria-labelledby="confirm-delete-member-title"
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7"
+        className="modal-card w-full max-w-md p-7"
       >
         <h2 id="confirm-delete-member-title" className="text-xl font-bold text-gray-900 mb-3">
           Remove Team Member
@@ -76,8 +76,9 @@ export default function ConfirmMemberDeleteModal({
             type="button"
             onClick={onConfirm}
             disabled={submitting}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl
-                       font-semibold shadow-sm transition-colors disabled:opacity-60"
+            className="flex-1 bg-brand-900 hover:bg-brand-800 text-white py-3 rounded-xl
+                       font-semibold shadow-sm shadow-brand-900/30
+                       transition-colors disabled:opacity-60"
           >
             {submitting ? 'Removing...' : 'Confirm Remove'}
           </button>

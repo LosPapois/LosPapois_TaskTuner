@@ -8,9 +8,20 @@ export interface NewTaskData {
   priority: NewTaskPriority;
   /** Required — the modal validates this is filled before submitting. */
   storyPoints: number;
-  userId: number;
+  /**
+   * Optional assignee. `null` (or undefined) means the task is created in
+   * the sprint without anyone assigned yet — useful for planning when the
+   * team drops stories into the sprint first and decides ownership later.
+   */
+  userId: number | null;
   /** Optional feature to group this task under. */
   featureId?: number | null;
+  /**
+   * Edit-mode-only flag. The parent uses it to know whether to PATCH the
+   * sprint-task state to 'done' / 'active' after the regular PUT. Ignored
+   * in create mode (new tasks always start as 'active').
+   */
+  isCompleted?: boolean;
 }
 
 /** Lightweight feature shape the modal needs for the assignee dropdown. */
@@ -31,6 +42,9 @@ export interface InitialTaskValues {
   storyPoints?: number | null;
   userId?: number | null;
   featureId?: number | null;
+  /** Sprint-task state of the row being edited ('active' | 'done' | 'delayed').
+   *  Used to pre-fill the "Mark as completed" checkbox in edit mode. */
+  stateTask?: string | null;
 }
 
 export interface AddTaskModalProps {
@@ -78,6 +92,9 @@ const EMPTY_FORM = {
   // '' = "(No feature)" — sentinel that lets the dropdown stay controlled
   // while still expressing "leave the FK null".
   featureId: '' as number | '',
+  // Only meaningful in edit mode. The "Mark as completed" checkbox flips
+  // this; SprintPage uses it to PATCH the sprint-task state on save.
+  isCompleted: false,
 };
 
 /**
@@ -120,6 +137,9 @@ export default function AddTaskModal({
         storyPoints:    initialTask.storyPoints != null ? String(initialTask.storyPoints) : '',
         userId:         initialTask.userId ?? '',
         featureId:      initialTask.featureId ?? '',
+        // Pre-check the box only when the sprint-task row is currently
+        // 'done', so unticking it later flips back to 'active'.
+        isCompleted:    (initialTask.stateTask ?? '').toLowerCase() === 'done',
       });
     } else {
       setForm(EMPTY_FORM);
@@ -169,9 +189,9 @@ export default function AddTaskModal({
     if (submitting) return;
 
     if (!form.nameTask.trim()) return setError('Task name is required.');
-    if (form.userId === '' || form.userId == null) {
-      return setError('Pick an assignee.');
-    }
+    // Assignee is now OPTIONAL — empty string from the dropdown means the
+    // task is created unassigned and stays in the sprint. We translate '' to
+    // null on submit instead of failing validation here.
 
     // Story points are required.
     if (form.storyPoints === '') {
@@ -190,9 +210,14 @@ export default function AddTaskModal({
         infoTask: form.infoTask.trim() || undefined,
         priority: form.priority,
         storyPoints,
-        userId: Number(form.userId),
+        // null = "(Unassigned)" sentinel from the dropdown → leaves USER_ID
+        // unset in the DB; the task still belongs to the sprint, just
+        // without an owner.
+        userId: form.userId === '' ? null : Number(form.userId),
         // null = "no feature" (sentinel empty string) → unset the FK.
         featureId: form.featureId === '' ? null : Number(form.featureId),
+        // Only meaningful for the EDIT path. Parent ignores it on create.
+        isCompleted: isEditMode ? form.isCompleted : undefined,
       });
       onClose();
     } catch (err) {
@@ -214,13 +239,48 @@ export default function AddTaskModal({
         aria-modal="true"
         aria-labelledby="add-task-title"
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7 max-h-[90vh] overflow-y-auto"
+        className="modal-card w-full max-w-md p-7 max-h-[90vh] overflow-y-auto"
       >
         <h2 id="add-task-title" className="text-xl font-bold text-gray-900 mb-5">
           {isEditMode ? 'Edit Task' : 'Add New Task'}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* "Mark as completed" — edit mode only. Lives at the top of the
+              form because it's the highest-impact toggle: flipping it changes
+              the sprint-task state (active <-> done) and the task's real end
+              date, which is visible everywhere (board, KPIs, statistics). */}
+          {isEditMode && (
+            <label
+              htmlFor="task-completed"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-colors
+                ${
+                  form.isCompleted
+                    ? 'bg-brand-lighter border-brand'
+                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                }`}
+            >
+              <input
+                id="task-completed"
+                type="checkbox"
+                checked={form.isCompleted}
+                onChange={e => setForm(p => ({ ...p, isCompleted: e.target.checked }))}
+                disabled={submitting}
+                className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+              />
+              <div className="flex-1">
+                <div className={`text-sm font-semibold ${form.isCompleted ? 'text-brand-900' : 'text-gray-700'}`}>
+                  Mark as completed
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {form.isCompleted
+                    ? 'Task will be moved to "Done" and stamped with today as its real end date.'
+                    : 'Task stays in its current state. Unchecking a previously completed task sends it back to "Active" — or "Delayed" if the due date has already passed.'}
+                </p>
+              </div>
+            </label>
+          )}
+
           <div>
             <label htmlFor="task-name" className="block text-sm font-semibold text-gray-800 mb-2">
               Task Name
@@ -299,7 +359,7 @@ export default function AddTaskModal({
 
           <div>
             <label htmlFor="task-assignee" className="block text-sm font-semibold text-gray-800 mb-2">
-              Assignee
+              Assignee <span className="text-gray-400 font-normal">(optional)</span>
             </label>
             <select
               id="task-assignee"
@@ -308,22 +368,28 @@ export default function AddTaskModal({
                 ...p,
                 userId: e.target.value === '' ? '' : Number(e.target.value),
               }))}
-              disabled={submitting || membersLoading || assigneeOptions.length === 0}
+              disabled={submitting || membersLoading}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm bg-white
                          focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand
                          transition-colors disabled:opacity-60"
             >
-              <option value="" disabled>
+              {/* "" is a legitimate value now — it means "create unassigned".
+                  The label shifts based on loading / empty states so it stays
+                  helpful in every case. */}
+              <option value="">
                 {membersLoading
                   ? 'Loading members…'
-                  : assigneeOptions.length === 0
-                    ? 'No project members — add some from Team first'
-                    : 'Select a member…'}
+                  : '(Unassigned — assign later)'}
               </option>
               {assigneeOptions.map(o => (
                 <option key={o.id} value={o.id}>{o.name}</option>
               ))}
             </select>
+            {!membersLoading && assigneeOptions.length === 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                No project members yet — task will be created unassigned. Add members from the Team page to assign later.
+              </p>
+            )}
           </div>
 
           <div>
