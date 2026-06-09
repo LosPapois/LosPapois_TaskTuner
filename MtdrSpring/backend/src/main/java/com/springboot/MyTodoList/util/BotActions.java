@@ -3,6 +3,7 @@ package com.springboot.MyTodoList.util;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -3104,7 +3105,11 @@ public class BotActions {
             return;
         }
 
-        task.setDateEndRealTask(LocalDate.now());
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = task.getDateStartTask();
+        LocalDate dueDate = task.getDateEndSetTask();
+
+        task.setDateEndRealTask(today);
         taskTTService.updateTask(taskId, task);
 
         sprintTaskTTService.getSprintsForTask(taskId).stream()
@@ -3113,10 +3118,49 @@ public class BotActions {
                 .ifPresent(st -> sprintTaskTTService.updateTaskState(
                         st.getId().getSprId(), taskId, TaskState.DONE.value()));
 
-        boolean onTime = !LocalDate.now().isAfter(task.getDateEndSetTask());
-        String resultado = onTime ? "⏱ delivered on time!" : "⚠️ delivered late.";
-        BotHelper.sendMessageToTelegram(
-                chatId, "✅ " + task.getNameTask() + " completed — " + resultado, telegramClient, null);
+        // ─── Build the completion summary message ──────────────────────────
+        // Two pieces of information:
+        //   1. Cycle time — how long the task took from start to completion.
+        //   2. On-time / late marker, with the exact day offset vs the due date.
+        // Both pieces gracefully degrade when their underlying dates are null
+        // (e.g. legacy tasks with no recorded start date).
+        StringBuilder summary = new StringBuilder("✅ ")
+                .append(task.getNameTask())
+                .append(" completed");
+
+        if (startDate != null) {
+            long daysTaken = ChronoUnit.DAYS.between(startDate, today);
+            if (daysTaken <= 0) {
+                summary.append(" in less than a day");
+            } else if (daysTaken == 1) {
+                summary.append(" in 1 day");
+            } else {
+                summary.append(" in ").append(daysTaken).append(" days");
+            }
+        }
+
+        if (dueDate != null) {
+            // Positive offset = task delivered BEFORE the due date.
+            // Zero          = delivered exactly on the due date.
+            // Negative      = delivered AFTER the due date (late).
+            long offset = ChronoUnit.DAYS.between(today, dueDate);
+            if (offset > 1) {
+                summary.append(" — ⏱ delivered ").append(offset).append(" days early!");
+            } else if (offset == 1) {
+                summary.append(" — ⏱ delivered 1 day early!");
+            } else if (offset == 0) {
+                summary.append(" — ⏱ delivered right on the due date!");
+            } else if (offset == -1) {
+                summary.append(" — ⚠️ delivered 1 day late.");
+            } else {
+                summary.append(" — ⚠️ delivered ").append(-offset).append(" days late.");
+            }
+        } else {
+            // No due date set — close the sentence neatly with a period.
+            summary.append('.');
+        }
+
+        BotHelper.sendMessageToTelegram(chatId, summary.toString(), telegramClient, null);
 
         showMainMenu();
         exit = true;
