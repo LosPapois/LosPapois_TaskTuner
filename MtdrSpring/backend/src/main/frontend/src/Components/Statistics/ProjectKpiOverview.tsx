@@ -1,6 +1,14 @@
 import React, { useMemo, useState } from 'react';
+import {
+  TrophyIcon,
+  ClipboardDocumentCheckIcon,
+  ChartBarIcon,
+  HashtagIcon,
+  ArrowTrendingUpIcon,
+} from '@heroicons/react/24/outline';
 import { SprintDTO, SprintTaskDTO, TaskDTO } from '../../Utils/types';
 import { normalizeTaskState } from '../../Utils/helpers';
+import KpiCard from '../Team/KpiCard';
 
 interface MemberOption {
   id: number;
@@ -39,16 +47,6 @@ function formatNumber(value: number, maxFractionDigits = 1): string {
   return new Intl.NumberFormat('en-US', {
     maximumFractionDigits: maxFractionDigits,
   }).format(value);
-}
-
-function KpiCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
-  return (
-    <div className="card-secondary">
-      <p className="text-xs font-semibold text-gray-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-gray-900">{value}</p>
-      {helper && <p className="mt-1 text-xs text-gray-500">{helper}</p>}
-    </div>
-  );
 }
 
 export default function ProjectKpiOverview({
@@ -115,10 +113,10 @@ export default function ProjectKpiOverview({
   }, [members, memberTotals]);
 
   return (
-    <section className="section-card-flex space-y-5" aria-labelledby="project-kpis-heading">
+    <section className="section-card-flex space-y-6" aria-labelledby="developer-kpis-heading">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 id="project-kpis-heading" className="heading-h4">Project KPIs</h2>
+        <div className="flex flex-col space-y-2">
+          <h2 id="developer-kpis-heading" className="heading-h4">Developer KPIs</h2>
           <p className="text-sm text-gray-500">
             Summary of effort per developer based on selected sprints.
           </p>
@@ -145,23 +143,34 @@ export default function ProjectKpiOverview({
         <KpiCard
           label="Total SP Completed"
           value={`${formatNumber(storyPointTotals.total, 0)} SP`}
-          helper="Only completed tasks"
-        />
+          icon={TrophyIcon}
+          tone="brand"
+        >
+          <p className="text-xs text-gray-500">Only completed tasks</p>
+        </KpiCard>
         <KpiCard
           label="Average Tasks per Developer"
           value={formatNumber(taskTotals.average)}
+          icon={ClipboardDocumentCheckIcon}
+          tone="info"
         />
         <KpiCard
           label="Average SP per Developer"
           value={`${formatNumber(storyPointTotals.average)} SP`}
+          icon={ChartBarIcon}
+          tone="warning"
         />
         <KpiCard
           label="Median Tasks per Developer"
           value={formatNumber(taskTotals.median)}
+          icon={HashtagIcon}
+          tone="success"
         />
         <KpiCard
           label="Median SP per Developer"
           value={`${formatNumber(storyPointTotals.median)} SP`}
+          icon={ArrowTrendingUpIcon}
+          tone="brand"
         />
       </div>
     </section>
